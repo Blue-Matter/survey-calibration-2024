@@ -17,7 +17,8 @@ dat <- readr::read_csv("validation/Cod_438_EngelCampelenSurveyData.csv") %>%
   filter(npue < 1e4) %>%
   mutate(long.start = -1 * long.start) %>%
   mutate(log_depth = log(set.depth.mean)) %>%
-  sdmTMB::add_utm_columns(ll_names = c("long.start", "lat.start"))
+  sdmTMB::add_utm_columns(ll_names = c("long.start", "lat.start")) %>%
+  mutate(doorspread = 1e3 * swept.area/dist.towed)
 
 # Proportion of zeros per year
 dat %>%
