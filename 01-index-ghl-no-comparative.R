@@ -109,12 +109,16 @@ g <- ggplot(index, aes(year, est)) +
 # Do retrospective
 yret <- 1995:2000
 fit_ret <- do_retrospective(yret, dat = dat_fit, sp = "ghl")
+fit_ret <- lapply(yret, function(y) {
+  readRDS(paste0("validation/models/ghl_ret_fit_", y, ".rds"))
+})
 index_ret <- make_index_ret(fit_ret, grid)
 readr::write_csv(index_ret, "validation/index/ghl_index_ret.csv")
+index_ret <- readr::read_csv("validation/index/ghl_index_ret.csv")
+vessel_effect <- get_vessel_effect(fit_ret) %>%
+  mutate(year_ret = .env$yret[.data$sequence])
 
-vessel_effect <- get_vessel_effect(fit_ret)
-
-g <- ggplot(vessel_effect, aes(year, Estimate)) +
+g <- ggplot(vessel_effect, aes(year_ret, Estimate)) +
   geom_point() +
   geom_linerange(aes(ymin = lwr, max = upr)) +
   labs(x = "Terminal year", y = "Campelen gear effect") +
@@ -143,9 +147,9 @@ g <- ggplot(index_ret, aes(year, est, colour = factor(year_ret))) +
 
 # Fit with gap
 fit_gap <- do_retrospective_gap(gap = 1:5, dat = dat_fit, sp = "ghl")
-fit_gap <- lapply(1:5, function(i) {
-  readRDS(paste0("validation/models/ghl_gap_fit_", i, ".rds"))
-})
+#fit_gap <- lapply(1:5, function(i) {
+#  readRDS(paste0("validation/models/ghl_gap_fit_", i, ".rds"))
+#})
 index_gap <- make_index_ret(fit_gap, grid)
 readr::write_csv(index_gap, "validation/index/ghl_index_gap.csv")
 index_gap <- readr::read_csv("validation/index/ghl_index_gap.csv")

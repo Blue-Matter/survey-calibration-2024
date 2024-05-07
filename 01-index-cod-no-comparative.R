@@ -108,10 +108,15 @@ yret <- 1995:2000
 fit_ret <- do_retrospective(yret, dat = dat_fit, sp = "cod")
 index_ret <- make_index_ret(fit_ret, grid)
 readr::write_csv(index_ret, "validation/index/cod_index_ret.csv")
+fit_ret <- lapply(yret, function(y) {
+  readRDS(paste0("validation/models/cod_ret_fit_", y, ".rds"))
+})
+index_ret <- readr::read_csv("validation/index/cod_index_ret.csv")
 
-vessel_effect <- get_vessel_effect(fit_ret)
+vessel_effect <- get_vessel_effect(fit_ret) %>%
+  mutate(year_ret = .env$yret[.data$sequence])
 
-g <- ggplot(vessel_effect, aes(year, .env$yret[.data$sequence])) +
+g <- ggplot(vessel_effect, aes(year_ret, Estimate)) +
   geom_point() +
   geom_linerange(aes(ymin = lwr, max = upr)) +
   labs(x = "Terminal year", y = "Campelen gear effect") +
