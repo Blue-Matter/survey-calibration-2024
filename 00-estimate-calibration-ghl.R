@@ -110,13 +110,6 @@ mresid <- simulateResiduals(m)
 residuals(mresid, quantileFunction = qnorm)
 plot(mresid)
 
-#m2 <- glmmTMB(
-#  Campelen ~ 1,
-#  data = dat_full,
-#  offset = log(dat_full$offset_ratio),
-#  family = betabinomial(link = "logit")
-#)
-
 g <- set_pair %>%
   reshape2::dcast(list("id", "gearname"), value.var = "npue") %>%
   ggplot(aes(Engel, Campelen)) +

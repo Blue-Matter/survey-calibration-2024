@@ -76,7 +76,11 @@ dat_full <- lapply(1:nrow(set_pair2), function(i) {
   data.frame(
     Campelen = c(rep(1, set_pair2$number_campelen[i]), rep(0, set_pair2$number_engel[i]))
   ) %>%
-    mutate(offset_ratio = set_pair2$offset_ratio[i], log_depth = log(set_pair2$depth[i]))
+    mutate(
+      id = set_pair2$id[i],
+      offset_ratio = set_pair2$offset_ratio[i],
+      log_depth = log(set_pair2$depth[i])
+    )
 }) %>%
   bind_rows()
 
@@ -95,24 +99,58 @@ m <- glmmTMB(
 )
 exp(0.77894)
 
+# All equivalent for estimating the gear effect, but impacts residual checking
+m <- glmmTMB(
+  p ~ 1,
+  data = set_pair2,
+  offset = log(set_pair2$offset_ratio),
+  family = binomial(link = "logit"),
+  weights = set_pair2$number_campelen + set_pair2$number_engel
+)
+m <- glmmTMB(
+  cbind(number_campelen, number_engel) ~ 1,
+  data = set_pair2,
+  offset = log(set_pair2$offset_ratio),
+  family = binomial(link = "logit")
+)
+
 m2 <- glmmTMB(
+  Campelen ~ 1,
+  data = dat_full,
+  offset = log(dat_full$offset_ratio),
+  family = betabinomial(link = "logit")
+)
+
+m3 <- glmmTMB(
   Campelen ~ 1 + poly(log_depth, 2),
   data = dat_full,
   offset = log(dat_full$offset_ratio),
   family = binomial(link = "logit")
 )
 
-library(DHARMa)
-mresid <- simulateResiduals(m)
-residuals(mresid, quantileFunction = qnorm)
-plot(mresid)
+# Random effect on individual pairs,
+# Effect size slightly higher, intercept = 0.8913
+m4 <- glmmTMB(
+  Campelen ~ 1 + (1|id),
+  data = dat_full,
+  offset = log(dat_full$offset_ratio),
+  family = binomial(link = "logit")
+)
 
-#m2 <- glmmTMB(
-#  Campelen ~ 1,
-#  data = dat_full,
-#  offset = log(dat_full$offset_ratio),
-#  family = betabinomial(link = "logit")
-#)
+# There is no overdispersion!
+m5 <- glmmTMB(
+  Campelen ~ 1 + (1|id),
+  data = dat_full,
+  offset = log(dat_full$offset_ratio),
+  family = betabinomial(link = "logit")
+)
+
+AIC(m, m2, m3, m4, m5)
+
+library(DHARMa)
+mresid <- simulateResiduals(m4)
+#residuals(mresid, quantileFunction = qnorm)
+plot(mresid)
 
 g <- set_pair %>%
   reshape2::dcast(list("id", "gearname"), value.var = "npue") %>%
@@ -120,6 +158,7 @@ g <- set_pair %>%
   geom_point(shape = 1) +
   geom_abline(linetype = 2, slope = 1, intercept = 0) +
   geom_abline(slope = exp(0.77894), intercept = 0) +
+  #geom_abline(slope = exp(0.8913), linetype = 3, intercept = 0) +
   geom_label(x = Inf, y = Inf, hjust = "inward", vjust = "inward", label = expression(rho==exp(0.77894))) +
   labs(x = "NPUE Engel", y = "NPUE Campelen")
 ggsave("validation/figures/cod_calibration.png", g, height = 3, width = 4)
