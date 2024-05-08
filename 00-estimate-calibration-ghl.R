@@ -68,7 +68,7 @@ set_pair2 <- set_pair %>%
     number_engel = number[2],
     offset_ratio = swept.area[1]/swept.area[2],
     depth = mean(set.depth.mean),
-    .by = c(id, NAFOdiv)
+    .by = c(id, NAFOdiv, strat)
   ) %>%
   filter(number_engel > 0 | number_campelen > 0) %>%
   mutate(p = number_campelen/(number_engel + number_campelen))
@@ -78,7 +78,12 @@ dat_full <- lapply(1:nrow(set_pair2), function(i) {
   data.frame(
     Campelen = c(rep(1, set_pair2$number_campelen[i]), rep(0, set_pair2$number_engel[i]))
   ) %>%
-    mutate(offset_ratio = set_pair2$offset_ratio[i], log_depth = log(set_pair2$depth[i]))
+    mutate(
+      id = set_pair2$id[i],
+      offset_ratio = set_pair2$offset_ratio[i],
+      log_depth = log(set_pair2$depth[i]),
+      NAFOdiv = set_pair2$NAFOdiv[i]
+    )
 }) %>%
   bind_rows()
 
@@ -95,28 +100,67 @@ m <- glmmTMB(
   offset = log(dat_full$offset_ratio),
   family = binomial(link = "logit")
 )
-exp(1.44256)
+fixef(m) # log-rho calibration factor = 1.443
 
+# There is no overdispersion!
 m2 <- glmmTMB(
+  Campelen ~ 1,
+  data = dat_full,
+  offset = log(dat_full$offset_ratio),
+  family = betabinomial(link = "logit")
+)
+
+m3 <- glmmTMB(
   Campelen ~ 1 + poly(log_depth, 2),
   data = dat_full,
   offset = log(dat_full$offset_ratio),
   family = binomial(link = "logit")
 )
-AIC(m, m2)
+
+# Random effect on individual pairs,
+# Effect size higher, intercept = 2.072
+m4 <- glmmTMB(
+  Campelen ~ 1 + (1|id),
+  data = dat_full,
+  offset = log(dat_full$offset_ratio),
+  family = binomial(link = "logit")
+)
+fixef(m4)
+
+m5 <- glmmTMB(
+  Campelen ~ 1 + (1|id),
+  data = dat_full,
+  offset = log(dat_full$offset_ratio),
+  family = betabinomial(link = "logit")
+)
+
+m6 <- glmmTMB(
+  Campelen ~ 1,
+  dispformula = ~ NAFOdiv,
+  data = dat_full,
+  offset = log(dat_full$offset_ratio),
+  family = betabinomial(link = "logit")
+)
+
+AIC(m, m2, m3, m4, m5)
 
 library(DHARMa)
 mresid <- simulateResiduals(m)
 residuals(mresid, quantileFunction = qnorm)
 plot(mresid)
 
+log_rho <- sapply(list(m, m4), function(x) fixef(x)[1] %>% as.numeric()) %>%
+  as.data.frame() %>%
+  mutate(int = 0, Model = c("Intercept-only", "Random effects"))
+
 g <- set_pair %>%
   reshape2::dcast(list("id", "gearname"), value.var = "npue") %>%
   ggplot(aes(Engel, Campelen)) +
   geom_point(shape = 1) +
-  geom_abline(linetype = 2, slope = 1, intercept = 0) +
-  geom_abline(slope = exp(1.44256), intercept = 0) +
-  geom_label(x = Inf, y = Inf, hjust = "inward", vjust = "inward", label = expression(rho==exp(1.44256))) +
+  geom_abline(linetype = 4, slope = 1, intercept = 0) +
+  geom_abline(data = log_rho, aes(slope = exp(.), linetype = Model, intercept = int)) +
+  #geom_label(x = Inf, y = Inf, hjust = "inward", vjust = "inward", label = expression(rho==exp(1.44256))) +
   labs(x = "NPUE Engel", y = "NPUE Campelen") +
-  coord_cartesian(xlim = c(0, 5000), ylim = c(0, 30000))
-ggsave("validation/figures/ghl_calibration.png", g, height = 3, width = 4)
+  theme(legend.position = "bottom") +
+  coord_cartesian(xlim = c(0, 5000), ylim = c(0, 30000), expand = FALSE)
+ggsave("validation/figures/ghl_calibration.png", g, height = 4, width = 4)

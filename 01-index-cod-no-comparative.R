@@ -150,7 +150,6 @@ fit_gap <- lapply(1:5, function(i) {
   readRDS(paste0("validation/models/cod_gap_fit_", i, ".rds"))
 })
 index_gap <- make_index_ret(fit_gap, grid)
-index_gap$gap <- rep(1:5, each = 36)
 readr::write_csv(index_gap, "validation/index/cod_index_gap.csv")
 index_gap <- readr::read_csv("validation/index/cod_index_gap.csv")
 
