@@ -1,5 +1,8 @@
 
 
+library(tidyverse)
+library(glmmTMB)
+
 setdat <- readr::read_csv("validation/CF_setdetails.csv") %>%
   select(-spec, -number, -weight)
 
@@ -91,7 +94,6 @@ g <- ggplot(set_pair, aes(set.depth.mean, npue)) +
 g <- ggplot(set_pair2, aes(depth, number_campelen/number_engel)) +
   geom_point()
 
-library(glmmTMB)
 m <- glmmTMB(
   Campelen ~ 1,
   data = dat_full,

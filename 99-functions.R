@@ -1,5 +1,6 @@
 
-fit_sdmTMB <- function(dat) {
+fit_sdmTMB <- function(dat, formula = number ~ poly(log_depth, 2, raw = TRUE) + data.series,
+                       offset = log(dat$swept.area)) {
 
   require(sdmTMB)
 
@@ -15,7 +16,7 @@ fit_sdmTMB <- function(dat) {
   )
 
   fit <- sdmTMB::sdmTMB(
-    formula = number ~ poly(log_depth, 2, raw = TRUE) + data.series,
+    formula = formula,
     data = dat,
     mesh = mesh,
     time = "year",
@@ -23,7 +24,7 @@ fit_sdmTMB <- function(dat) {
     extra_time = extra_time,
     spatial = "on",
     spatiotemporal = "rw",
-    offset = log(dat$swept.area),
+    offset = offset,
     anisotropy = TRUE
   )
 
