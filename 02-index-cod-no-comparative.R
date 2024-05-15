@@ -116,11 +116,20 @@ index_ret <- readr::read_csv("validation/index/cod_index_ret.csv")
 vessel_effect <- get_vessel_effect(fit_ret) %>%
   mutate(year_ret = .env$yret[.data$sequence])
 
+log_rho_comparative <- data.frame(
+  x = c(-Inf, Inf),
+  y1 = 0.8913 + 1.96 * 0.616,
+  y2 = 0.8913 - 1.96 * 0.616
+)
+
 g <- ggplot(vessel_effect, aes(year_ret, Estimate)) +
+  geom_ribbon(data = log_rho_comparative, fill = "grey80", aes(x, ymin = y2, ymax = y1), inherit.aes = FALSE) +
+  geom_hline(yintercept = 0.8913 + 1.96 * 0.616, linetype = 3) +
+  geom_hline(yintercept = 0.8913, linetype = 2) +
+  geom_hline(yintercept = 0.8913 - 1.96 * 0.616, linetype = 3) +
   geom_point() +
   geom_linerange(aes(ymin = lwr, max = upr)) +
-  labs(x = "Terminal year", y = "Campelen gear effect") +
-  geom_hline(yintercept = 0, linetype = 2)
+  labs(x = "Terminal year", y = "Campelen gear effect")
 .ggsave("retrospective_vessel_effect.png", g, height = 3, width = 4)
 
 g <- ggplot(index_ret, aes(year, est, colour = factor(year_ret))) +
@@ -182,11 +191,15 @@ g <- ggplot(index_gap, aes(year, log(est))) +
 
 vessel_effect <- get_vessel_effect(fit_gap)
 
+
 g <- ggplot(vessel_effect, aes(sequence, Estimate)) +
+  geom_ribbon(data = log_rho_comparative, fill = "grey80", aes(x, ymin = y2, ymax = y1), inherit.aes = FALSE) +
+  geom_hline(yintercept = 0.8913 + 1.96 * 0.616, linetype = 3) +
+  geom_hline(yintercept = 0.8913, linetype = 2) +
+  geom_hline(yintercept = 0.8913 - 1.96 * 0.616, linetype = 3) +
   geom_point() +
   geom_linerange(aes(ymin = lwr, max = upr)) +
-  labs(x = "Survey gap", y = "Campelen gear effect") +
-  geom_hline(yintercept = 0, linetype = 2)
+  labs(x = "Survey gap", y = "Campelen gear effect")
 .ggsave("gap_vessel_effect.png", g, height = 3, width = 4)
 
 ## Design-based index ----

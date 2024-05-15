@@ -115,14 +115,24 @@ fit_ret <- lapply(yret, function(y) {
 index_ret <- make_index_ret(fit_ret, grid)
 readr::write_csv(index_ret, "validation/index/ghl_index_ret.csv")
 index_ret <- readr::read_csv("validation/index/ghl_index_ret.csv")
+
 vessel_effect <- get_vessel_effect(fit_ret) %>%
   mutate(year_ret = .env$yret[.data$sequence])
 
+log_rho_comparative <- data.frame(
+  x = c(-Inf, Inf),
+  y1 = 2.072 + 1.96 * 0.08256,
+  y2 = 2.072 - 1.96 * 0.08256
+)
+
 g <- ggplot(vessel_effect, aes(year_ret, Estimate)) +
+  geom_ribbon(data = log_rho_comparative, fill = "grey80", aes(x, ymin = y2, ymax = y1), inherit.aes = FALSE) +
+  geom_hline(yintercept = 2.072 + 1.96 * 0.08256, linetype = 3) +
+  geom_hline(yintercept = 2.072, linetype = 2) +
+  geom_hline(yintercept = 2.072 - 1.96 * 0.08256, linetype = 3) +
   geom_point() +
   geom_linerange(aes(ymin = lwr, max = upr)) +
-  labs(x = "Terminal year", y = "Campelen gear effect") +
-  geom_hline(yintercept = 0, linetype = 2)
+  labs(x = "Terminal year", y = "Campelen gear effect")
 .ggsave("retrospective_vessel_effect.png", g, height = 3, width = 4)
 
 g <- ggplot(index_ret, aes(year, est, colour = factor(year_ret))) +
@@ -147,9 +157,9 @@ g <- ggplot(index_ret, aes(year, est, colour = factor(year_ret))) +
 
 # Fit with gap
 fit_gap <- do_retrospective_gap(gap = 1:5, dat = dat_fit, sp = "ghl")
-#fit_gap <- lapply(1:5, function(i) {
-#  readRDS(paste0("validation/models/ghl_gap_fit_", i, ".rds"))
-#})
+fit_gap <- lapply(1:5, function(i) {
+  readRDS(paste0("validation/models/ghl_gap_fit_", i, ".rds"))
+})
 index_gap <- make_index_ret(fit_gap, grid)
 readr::write_csv(index_gap, "validation/index/ghl_index_gap.csv")
 index_gap <- readr::read_csv("validation/index/ghl_index_gap.csv")
@@ -184,6 +194,10 @@ g <- index_gap %>%
 vessel_effect <- get_vessel_effect(fit_gap)
 
 g <- ggplot(vessel_effect, aes(sequence, Estimate)) +
+  geom_ribbon(data = log_rho_comparative, fill = "grey80", aes(x, ymin = y2, ymax = y1), inherit.aes = FALSE) +
+  geom_hline(yintercept = 2.072 + 1.96 * 0.08256, linetype = 3) +
+  geom_hline(yintercept = 2.072, linetype = 2) +
+  geom_hline(yintercept = 2.072 - 1.96 * 0.08256, linetype = 3) +
   geom_point() +
   geom_linerange(aes(ymin = lwr, max = upr)) +
   labs(x = "Survey gap", y = "Campelen gear effect") +

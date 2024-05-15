@@ -118,7 +118,7 @@ m3 <- glmmTMB(
 )
 
 # Random effect on individual pairs,
-# Effect size higher, intercept = 2.072
+# Effect size higher, intercept = 2.072, SE = 0.08256
 m4 <- glmmTMB(
   Campelen ~ 1 + (1|id),
   data = dat_full,
