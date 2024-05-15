@@ -85,14 +85,22 @@ index <- make_index(fit, grid)
 readr::write_csv(index, "validation/index/ghl_index.csv")
 index <- readr::read_csv("validation/index/ghl_index.csv")
 
-g <- ggplot(index, aes(year, est)) +
+index_best <- readr::read_csv("validation/index/ghl_index_calibration.csv")
+
+g <- rbind(
+  index %>% mutate(Type = "Estimate rho"),
+  index_best %>% mutate(Type = "With comparative rho")
+) %>%
+  ggplot(aes(year, est, linetype = Type, shape = Type)) +
   geom_point() +
   geom_line() +
   expand_limits(y = 0) +
   geom_vline(xintercept = 1994.5, linetype = 2) +
   labs(x = "Year", y = "Campelen Index", colour = "Terminal year") +
   guides(colour = "none") +
-  theme(panel.spacing = unit(0, "in"))
+  scale_shape_manual(values = c(1, 16)) +
+  scale_linetype_manual(values = c(2, 1)) +
+  theme(legend.position = "bottom")
 .ggsave("index_no_comparative.png", g, height = 3.5, width = 6)
 
 g <- ggplot(index, aes(year, est)) +
@@ -136,10 +144,12 @@ g <- ggplot(vessel_effect, aes(year_ret, Estimate)) +
 .ggsave("retrospective_vessel_effect.png", g, height = 3, width = 4)
 
 g <- ggplot(index_ret, aes(year, est, colour = factor(year_ret))) +
+  geom_line(data = index_best, aes(year, est), linewidth = 1, inherit.aes = FALSE) +
   geom_point() +
   geom_line() +
   expand_limits(y = 0) +
   geom_vline(xintercept = 1994.5, linetype = 2) +
+  coord_cartesian(xlim = c(1985, 2000)) +
   labs(x = "Year", y = "Campelen Index", colour = "Terminal year")
 .ggsave("index_retrospective.png", g, height = 3, width = 6)
 
@@ -165,7 +175,7 @@ readr::write_csv(index_gap, "validation/index/ghl_index_gap.csv")
 index_gap <- readr::read_csv("validation/index/ghl_index_gap.csv")
 
 g <- ggplot(index_gap, aes(year, est)) +
-  geom_line(data = index, linewidth = 1) +
+  geom_line(data = index_best, aes(year, est), linewidth = 1, inherit.aes = FALSE) +
   geom_point(aes(shape = impute, colour = factor(gap))) +
   geom_line(linetype = 2, aes(colour = factor(gap))) +
   geom_line(data = dplyr::filter(index_gap, year < year[which(.data$impute)[1]], .by = gap), aes(colour = factor(gap))) +
@@ -179,7 +189,7 @@ g <- ggplot(index_gap, aes(year, est)) +
 
 g <- index_gap %>%
   ggplot(aes(year, log(est))) +
-  geom_line(data = index, linewidth = 1) +
+  geom_line(data = index_best, linewidth = 1) +
   geom_point(aes(shape = impute, colour = factor(gap))) +
   geom_line(linetype = 2, aes(colour = factor(gap))) +
   geom_line(data = dplyr::filter(index_gap, year < year[which(.data$impute)[1]], .by = gap), aes(colour = factor(gap))) +
