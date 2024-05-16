@@ -82,21 +82,27 @@ index <- make_index(fit, grid)
 readr::write_csv(index, "validation/index/cod_index.csv")
 index <- readr::read_csv("validation/index/cod_index.csv")
 
+fit_norho <- fit_sdmTMB(dat_fit, formula = number ~ poly(log_depth, 2, raw = TRUE))
+saveRDS(fit_norho, "validation/models/cod_fit_norho.rds")
+
+index_norho <- make_index(fit_norho, grid)
+readr::write_csv(index_norho, "validation/index/cod_index_norho.csv")
+
 index_best <- readr::read_csv("validation/index/cod_index_calibration.csv")
 
 g <- rbind(
-  index %>% mutate(Type = "Estimate rho"),
-  index_best %>% mutate(Type = "With comparative rho")
+  index %>% mutate(Model = "Estimate rho"),
+  index_best %>% mutate(Model = "With comparative rho"),
+  index_norho %>% mutate(Model = "No rho")
 ) %>%
-  ggplot(aes(year, est, linetype = Type, shape = Type)) +
+  ggplot(aes(year, est, linetype = Model, shape = Model)) +
   geom_point() +
   geom_line() +
-  expand_limits(y = 0) +
   geom_vline(xintercept = 1994.5, linetype = 2) +
   labs(x = "Year", y = "Campelen Index", colour = "Terminal year") +
   guides(colour = "none") +
-  scale_shape_manual(values = c(1, 16)) +
-  scale_linetype_manual(values = c(2, 1)) +
+  scale_shape_manual(values = c(1, 4, 16)) +
+  scale_linetype_manual(values = c(2, 3, 1)) +
   theme(legend.position = "bottom")
 .ggsave("index_no_comparative.png", g, height = 4, width = 6)
 
