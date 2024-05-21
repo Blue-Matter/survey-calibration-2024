@@ -161,7 +161,7 @@ plot_rho <- function(m, bin = seq(0, 200, 1)) {
     geom_line(aes(y = log_rho)) +
     geom_line(aes(y = log_rho + 1.96 * se), linetype = 2) +
     geom_line(aes(y = log_rho - 1.96 * se), linetype = 2) +
-    labs(x = "Length bin", y = expression(log(rho)))
+    labs(x = "Length", y = expression(log(rho)))
   g
 }
 g <- plot_rho(m6) +
@@ -186,7 +186,7 @@ set_len <- readr::read_csv("validation_size/CF_lengthfreqs_438_892.csv") %>%
 
 g <- ggplot(set_len, aes(bin, value, colour = gear)) +
   geom_line() +
-  labs(x = "length", y = "Frequency", colour = "Gear")
+  labs(x = "Length", y = "Frequency", colour = "Gear")
 ggsave("validation_size/figures/ghl_CF_lengthcomp.png", g, width = 6, height = 3.5)
 
 
