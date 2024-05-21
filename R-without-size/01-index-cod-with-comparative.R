@@ -20,7 +20,7 @@ dat <- readr::read_csv("validation/Cod_438_EngelCampelenSurveyData.csv") %>%
   sdmTMB::add_utm_columns(ll_names = c("long.start", "lat.start")) %>%
   mutate(doorspread = 1e3 * swept.area/dist.towed) %>%
   mutate(data.series = factor(data.series, levels = c("Engel", "Campelen"))) %>%
-  mutate(calibration = ifelse(data.series == "Engel", exp(0.8913), 1))
+  mutate(calibration = ifelse(data.series == "Engel", exp(2.072), 1))
 
 # Data set to fit full model
 dat_fit <- filter(dat, year >= 1985, year <= 2020)

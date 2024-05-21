@@ -1,4 +1,80 @@
 
+
+expand_number_len <- function(dat_lf, dat_rho, length_bin) {
+  lf_cols <- names(dat_lf)[grep("lf", names(dat_lf))]
+
+  d <- dat_lf %>%
+    select(year, vessel, trip, set, NAFOdiv, strat, strat.area, long.start, lat.start, set.depth.mean, data.series, dist.towed, number, nmeasured,
+           starts_with("lf")) %>%
+    reshape2::melt(measure.vars = lf_cols) %>%
+    mutate(
+      value.expand = ifelse(number > 0, number/nmeasured * value, 0),
+      len = strsplit(as.character(.data$variable), "lf") %>% sapply(getElement, 2) %>% as.numeric() %>% round()
+    )
+
+  if (missing(dat_rho)) {
+    d$rho <- 1
+    d$value.calibrate <- d$value.expand * d$rho
+  } else {
+    d <- left_join(
+      d,
+      select(dat_rho, bin, rho),
+      by = c("len" = "bin")
+    ) %>%
+      mutate(value.calibrate = value.expand * rho)
+  }
+
+  if (missing(length_bin)) {
+    d$bin <- d$len
+  } else {
+    d <- d %>%
+      mutate(bin = findInterval(len, length_bin))
+  }
+
+  dout <- d %>%
+    summarise(number.size = sum(value.expand),
+              number.calibrate = sum(value.calibrate),
+              .by = c(year, vessel, trip, set, NAFOdiv, strat, strat.area, long.start, lat.start,
+                      set.depth.mean, data.series, dist.towed, number, nmeasured, bin)) %>%
+    mutate(rho.eff = ifelse(number.size > 0, number.calibrate/number.size, NA))
+
+  if (missing(length_bin)) {
+    dout$length <- dout$bin
+  } else {
+    dout <- dout %>%
+      mutate(length = length_bin[.data$bin])
+  }
+
+  return(dout)
+}
+
+make_design_index <- function(dat) {
+
+  index_design <- dat %>%
+    filter(!is.na(strat.area)) %>%
+    summarise(
+      index_strat = mean(number),
+      var_strat = var(number),
+      n = n(),
+      nsamp = unique(strat.area)/mean(swept.area),
+      .by = c(year, strat, strat.area)
+    ) %>%
+    mutate(var_strat = ifelse(is.na(var_strat), 0, var_strat)) %>%
+    mutate(area_total = sum(strat.area), .by = year) %>%
+    summarise(
+      est = sum(index_strat * nsamp),
+      var = sum(nsamp * (nsamp - n)/n * var_strat)/sum(nsamp)/sum(nsamp), # See SimSurvey appendix
+      .by = year
+    ) %>%
+    mutate(
+      se = sqrt(var),
+      cv = se/est,
+      lwr = est - 1.96 * se,
+      upr = est + 1.96 * se
+    )
+  return(index_design)
+}
+
 fit_sdmTMB <- function(dat, formula = number ~ poly(log_depth, 2, raw = TRUE) + data.series,
                        offset = log(dat$swept.area)) {
 

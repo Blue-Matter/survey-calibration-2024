@@ -87,6 +87,7 @@ saveRDS(fit_norho, "validation/models/cod_fit_norho.rds")
 
 index_norho <- make_index(fit_norho, grid)
 readr::write_csv(index_norho, "validation/index/cod_index_norho.csv")
+index_norho <- readr::read_csv("validation/index/cod_index_norho.csv")
 
 index_best <- readr::read_csv("validation/index/cod_index_calibration.csv")
 
@@ -132,15 +133,15 @@ vessel_effect <- get_vessel_effect(fit_ret) %>%
 
 log_rho_comparative <- data.frame(
   x = c(-Inf, Inf),
-  y1 = 0.8913 + 1.96 * 0.616,
-  y2 = 0.8913 - 1.96 * 0.616
+  y1 = 2.072 + 1.96 * 0.08256,
+  y2 = 2.072 - 1.96 * 0.08256
 )
 
 g <- ggplot(vessel_effect, aes(year_ret, Estimate)) +
   geom_ribbon(data = log_rho_comparative, fill = "grey80", aes(x, ymin = y2, ymax = y1), inherit.aes = FALSE) +
-  geom_hline(yintercept = 0.8913 + 1.96 * 0.616, linetype = 3) +
-  geom_hline(yintercept = 0.8913, linetype = 2) +
-  geom_hline(yintercept = 0.8913 - 1.96 * 0.616, linetype = 3) +
+  geom_hline(yintercept = log_rho_comparative$y1[1], linetype = 3) +
+  geom_hline(yintercept = log_rho_comparative$y2[1], linetype = 3) +
+  geom_hline(yintercept = 2.072, linetype = 2) +
   geom_point() +
   geom_linerange(aes(ymin = lwr, max = upr)) +
   labs(x = "Terminal year", y = "Campelen gear effect")
@@ -210,9 +211,9 @@ vessel_effect <- get_vessel_effect(fit_gap)
 
 g <- ggplot(vessel_effect, aes(sequence, Estimate)) +
   geom_ribbon(data = log_rho_comparative, fill = "grey80", aes(x, ymin = y2, ymax = y1), inherit.aes = FALSE) +
-  geom_hline(yintercept = 0.8913 + 1.96 * 0.616, linetype = 3) +
-  geom_hline(yintercept = 0.8913, linetype = 2) +
-  geom_hline(yintercept = 0.8913 - 1.96 * 0.616, linetype = 3) +
+  geom_hline(yintercept = log_rho_comparative$y1[1], linetype = 3) +
+  geom_hline(yintercept = log_rho_comparative$y2[1], linetype = 3) +
+  geom_hline(yintercept = 2.072, linetype = 2) +
   geom_point() +
   geom_linerange(aes(ymin = lwr, max = upr)) +
   labs(x = "Survey gap", y = "Campelen gear effect")
@@ -231,36 +232,23 @@ survey_area <- dat_fit %>%
   filter(!is.na(strat), !is.na(area_km2)) %>%
   mutate(ratio = area_km2/strat.area)
 
-index_design <- dat_fit %>%
-  filter(!is.na(strat.area)) %>%
-  mutate(npue_expand = npue * strat.area) %>%
-  summarise(
-    index_strat = mean(npue_expand),
-    var_strat = var(npue_expand),
-    n = n(),
-    nsamp = unique(strat.area)/sum(swept.area) * n,
-    .by = c(year, strat, strat.area)
-  ) %>%
-  mutate(var_strat = ifelse(is.na(var_strat), 0, var_strat)) %>%
-  mutate(area_total = sum(strat.area), .by = year) %>%
-  summarise(
-    est = sum(index_strat),
-    var = sum(nsamp * (nsamp - n)/n * var_strat)/sum(nsamp)/sum(nsamp), # See SimSurvey appendix
-    .by = year
-  ) %>%
-  mutate(
-    se = sqrt(var),
-    cv = se/est,
-    lwr = est - 1.96 * se,
-    upr = est + 1.96 * se
-  )
-
-g <- index_design %>%
-  ggplot(aes(year, est)) +
-  geom_linerange(aes(ymin = lwr, ymax = upr)) +
+g <- rbind(
+  dat_fit %>%
+    make_design_index() %>%
+    mutate(Calibrated = FALSE),
+  dat_fit %>%
+    mutate(number = number * ifelse(data.series == "Engel", exp(2.072), 1)) %>%
+    make_design_index() %>%
+    mutate(Calibrated = TRUE)
+) %>%
+  ggplot(aes(year, est, linetype = Calibrated, shape = Calibrated)) +
+  #geom_linerange(aes(ymin = lwr, ymax = upr)) +
   geom_point() +
   geom_line() +
   expand_limits(y = 0) +
   geom_vline(xintercept = 1994.5, linetype = 2) +
-  labs(x = "Year", y = "Design-based index")
-.ggsave("index_design.png", g, height = 4, width = 6)
+  labs(x = "Year", y = "Design index") +
+  scale_linetype_manual(values = c(3, 1)) +
+  scale_shape_manual(values = c(1, 16)) +
+  theme(legend.position = "bottom")
+.ggsave("index_design.png", g, height = 4.5, width = 6)

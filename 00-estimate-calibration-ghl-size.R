@@ -2,6 +2,7 @@
 
 library(tidyverse)
 library(glmmTMB)
+library(DHARMa)
 
 setdat <- readr::read_csv("validation/CF_setdetails.csv") %>%
   select(-spec, -number, -weight)
@@ -21,14 +22,14 @@ gear_df <- data.frame(
   gearname = c("Campelen", "Engel", "Engel")
 )
 
-# Cod = 902, Halibut = 438
+# Cod = 438, Halibut = 892
 spec_df <- data.frame(
-  spec = c(892, 438),
+  spec = c(438, 892),
   species = c("cod", "ghl")
 )
 
 set_len <- readr::read_csv("validation_size/CF_lengthfreqs_438_892.csv") %>%
-  filter(spec == 438, year == 95) %>%
+  filter(spec == 892, year == 95) %>%
   filter(length.group == 1) %>%
   select(vessel, trip, set, NAFOdiv, sex, starts_with("bin")) %>%
   reshape2::melt(id.vars = c("vessel", "trip", "set", "NAFOdiv", "sex")) %>%
@@ -43,7 +44,7 @@ set_len <- readr::read_csv("validation_size/CF_lengthfreqs_438_892.csv") %>%
 
 set_spec <- left_join(
   setdat,
-  setbio %>% filter(spec == 438) # 650 rows
+  setbio %>% filter(spec == 892) # 650 rows
 ) %>%
   left_join(vessel_df) %>%
   left_join(gear_df) %>%
@@ -109,49 +110,70 @@ m <- glmmTMB(
   cbind(number_campelen, number_engel) ~ 1,
   data = set_pair2,
   offset = log(offset_ratio),
-  family = binomial(link = "logit")
+  family = binomial()
 )
 
 m2 <- glmmTMB(
   cbind(number_campelen, number_engel) ~ 1,
   data = set_pair2,
-  offset = log(set_pair2$offset_ratio),
-  family = betabinomial(link = "logit")
+  offset = log(offset_ratio),
+  family = betabinomial()
 )
 
 m3 <- glmmTMB(
   cbind(number_campelen, number_engel) ~ 1 + (1 | id),
   data = set_pair2,
-  offset = log(set_pair2$offset_ratio),
-  family = binomial(link = "logit")
+  offset = log(offset_ratio),
+  family = binomial()
 )
 
 m4 <- glmmTMB(
-  cbind(number_campelen, number_engel) ~ s(bin, bs = "cr") + 0,
+  cbind(number_campelen, number_engel) ~ 0 + s(bin, bs = "cr"),
   data = set_pair2,
-  offset = log(set_pair2$offset_ratio),
-  family = binomial(link = "logit")
+  offset = log(offset_ratio),
+  family = binomial(),
+  REML = TRUE
 )
 
 m5 <- glmmTMB(
-  cbind(number_campelen, number_engel) ~ s(bin, bs = "cr") + 0,
+  cbind(number_campelen, number_engel) ~ 0 + s(bin, bs = "cr"),
   data = set_pair2,
   offset = log(offset_ratio),
-  family = betabinomial(link = "logit")
+  family = betabinomial(),
+  REML = TRUE
 )
 
 m6 <- glmmTMB(
-  cbind(number_campelen, number_engel) ~ s(bin, bs = "cr") + 0 + (1 | id),
+  cbind(number_campelen, number_engel) ~ 0 + s(bin, bs = "cr") + (1 | id),
   data = set_pair2,
   offset = log(offset_ratio),
-  family = binomial(link = "logit")
+  family = binomial(),
+  REML = TRUE
 )
 
+# m6 has the best deviance score but poorest residual behavior. Thus, proceed with m3 (constant rho by size)
+# From m3: log_rho = 0.9107, SE = 0.0638
 AIC(m, m2, m3, m4, m5, m6)
+sapply(list(m, m2, m3, m4, m5, m6), deviance)
+
+
+resid6 <- simulateResiduals(m6, n = 500)
+plot(resid6)
+testDispersion(resid6)
+testOutliers(resid6)
+testResiduals(resid6)
+testZeroInflation(resid6)
+
+resid3 <- simulateResiduals(m3, n = 500)
+plot(resid3)
+testDispersion(resid3)
+testResiduals(resid3)
+testOverdispersion(resid3)
+
 
 plot_rho <- function(m, bin = seq(0, 200, 1)) {
-  est <- data.frame(bin = bin, offset_ratio = 1)
-  pred <- predict(m, est, re.form = NA, se.fit = TRUE, cov.fit = TRUE)
+  est <- data.frame(bin = bin, offset_ratio = 1, id = NA)
+  pred <- predict(m, est, re.form = NULL, se.fit = TRUE, cov.fit = TRUE)
 
   est$log_rho <- pred$fit
   est$se <- pred$se.fit
@@ -164,15 +186,24 @@ plot_rho <- function(m, bin = seq(0, 200, 1)) {
     labs(x = "Length", y = expression(log(rho)))
   g
 }
-g <- plot_rho(m6) +
-  coord_cartesian(xlim = c(0, 100), ylim = c(-4, 3))
-ggsave("validation_size/figures/ghl_rho_comparative.png", g, width = 5, height = 3.5)
+g <- rbind(
+  plot_rho(m3) %>% getElement("data") %>% mutate(Model = "Constant rho"),
+  plot_rho(m6) %>% getElement("data") %>% mutate(Model = "Rho by size")
+) %>%
+  mutate(rho = exp(log_rho)) %>%
+  ggplot(aes(bin, colour = Model)) +
+  geom_line(aes(y = log_rho)) +
+  geom_line(aes(y = log_rho + 1.96 * se), linetype = 2) +
+  geom_line(aes(y = log_rho - 1.96 * se), linetype = 2) +
+  labs(x = "Length", y = expression(log(rho))) +
+  coord_cartesian(xlim = c(0, 75), ylim = c(-4, 6))
+ggsave("validation_size/figures/ghl_rho_comparative.png", g, width = 6, height = 3.5)
 
 readr::write_csv(g$data, file = "validation_size/ghl_rho_comparative.csv")
 
 # Plot length comp
 set_len <- readr::read_csv("validation_size/CF_lengthfreqs_438_892.csv") %>%
-  filter(spec == 438, year == 95) %>%
+  filter(spec == 892, year == 95) %>%
   filter(length.group == 1) %>%
   select(vessel, trip, set, NAFOdiv, sex, starts_with("bin")) %>%
   reshape2::melt(id.vars = c("vessel", "trip", "set", "NAFOdiv", "sex")) %>%
@@ -181,7 +212,7 @@ set_len <- readr::read_csv("validation_size/CF_lengthfreqs_438_892.csv") %>%
   #mutate(binmid = paste0("bin", 10 * (bin10 - 1) + 5)) %>%
   summarise(value = sum(value),
             .by = c(vessel, bin)) %>%
-  filter(bin < 100) %>%
+  filter(bin <= 75) %>%
   mutate(gear = ifelse(vessel == 20, "Engel", "Campelen"))
 
 g <- ggplot(set_len, aes(bin, value, colour = gear)) +
@@ -208,9 +239,7 @@ g <- set_pair %>%
   summarise(n = n(), .by = c(bin, type)) %>%
   ggplot(aes(bin, n, fill = type)) +
   geom_col(width = 1, colour = "grey60", linewidth = 0.25) +
+  coord_cartesian(xlim = c(0, 75)) +
   labs(x = "Length", y = "Paired tow frequency", fill = "Presence")
 ggsave("validation_size/figures/ghl_CF_pairfrequency.png", g, width = 6, height = 3.5)
-
-
-
 
