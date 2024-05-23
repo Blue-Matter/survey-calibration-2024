@@ -119,6 +119,7 @@ m3 <- glmmTMB(
 
 # Random effect on individual pairs,
 # Effect size higher, intercept = 0.8913, SE = 0.0616
+# 3L only, intercept = 0.9840, SE = 0.1157
 m4 <- glmmTMB(
   Campelen ~ 1 + (1|id),
   data = dat_full,
@@ -134,13 +135,13 @@ m5 <- glmmTMB(
   family = betabinomial(link = "logit")
 )
 
-m6 <- glmmTMB(
-  Campelen ~ 1,
-  dispformula = ~ NAFOdiv,
-  data = dat_full,
-  offset = log(offset_ratio),
-  family = betabinomial(link = "logit")
-)
+#m6 <- glmmTMB(
+#  Campelen ~ 1,
+#  dispformula = ~ NAFOdiv,
+#  data = dat_full,
+#  offset = log(offset_ratio),
+#  family = betabinomial(link = "logit")
+#)
 
 AIC(m, m2, m3, m4, m5)
 
