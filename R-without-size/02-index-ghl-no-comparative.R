@@ -138,8 +138,8 @@ vessel_effect <- get_vessel_effect(fit_ret) %>%
 
 log_rho_comparative <- data.frame(
   x = c(-Inf, Inf),
-  y1 = 0.8913 + 1.96 * 0.616,
-  y2 = 0.8913 - 1.96 * 0.616
+  y1 = 0.8913 + 1.96 * 0.0616,
+  y2 = 0.8913 - 1.96 * 0.0616
 )
 
 g <- ggplot(vessel_effect, aes(year_ret, Estimate)) +
