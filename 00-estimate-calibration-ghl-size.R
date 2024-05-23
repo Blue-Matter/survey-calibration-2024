@@ -217,7 +217,8 @@ set_len <- readr::read_csv("validation_size/CF_lengthfreqs_438_892.csv") %>%
 
 g <- ggplot(set_len, aes(bin, value, colour = gear)) +
   geom_line() +
-  labs(x = "Length", y = "Frequency", colour = "Gear")
+  labs(x = "Length", y = "Frequency", colour = "Gear") +
+  coord_cartesian(xlim = c(0, 75))
 ggsave("validation_size/figures/ghl_CF_lengthcomp.png", g, width = 6, height = 3.5)
 
 

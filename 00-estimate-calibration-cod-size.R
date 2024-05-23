@@ -238,7 +238,7 @@ g <- set_pair %>%
   summarise(type = set_pair_fn(number), .by = c(id, bin)) %>%
   summarise(n = n(), .by = c(bin, type)) %>%
   ggplot(aes(bin, n, fill = type)) +
-  coord_cartesian(xlim = c(0, 125)) +
+  coord_cartesian(xlim = c(0, 100)) +
   geom_col(width = 1, colour = "grey60", linewidth = 0.25) +
   labs(x = "Length", y = "Paired tow frequency", fill = "Presence")
 ggsave("validation_size/figures/cod_CF_pairfrequency.png", g, width = 6, height = 3.5)
