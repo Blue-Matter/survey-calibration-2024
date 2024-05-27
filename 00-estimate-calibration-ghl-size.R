@@ -1,7 +1,8 @@
 
 
 library(tidyverse)
-library(glmmTMB)
+#library(glmmTMB)
+library(sdmTMB)
 library(DHARMa)
 
 setdat <- readr::read_csv("validation/CF_setdetails.csv") %>%
@@ -106,58 +107,123 @@ set_pair2 <- set_pair %>%
 #}) %>%
 #  bind_rows()
 
-m <- glmmTMB(
-  cbind(number_campelen, number_engel) ~ 1,
-  data = set_pair2,
-  offset = log(offset_ratio),
-  family = binomial()
-)
+#m <- glmmTMB(
+#  cbind(number_campelen, number_engel) ~ 1,
+#  data = set_pair2,
+#  offset = log(offset_ratio),
+#  family = binomial()
+#)
+#
+#m2 <- glmmTMB(
+#  cbind(number_campelen, number_engel) ~ 1,
+#  data = set_pair2,
+#  offset = log(offset_ratio),
+#  family = betabinomial()
+#)
+#
+#m3 <- glmmTMB(
+#  cbind(number_campelen, number_engel) ~ 1 + (1 | id),
+#  data = set_pair2,
+#  offset = log(offset_ratio),
+#  family = binomial()
+#)
+#
+#m4 <- glmmTMB(
+#  cbind(number_campelen, number_engel) ~ 0 + s(bin, bs = "cr"),
+#  data = set_pair2,
+#  offset = log(offset_ratio),
+#  family = binomial(),
+#  REML = TRUE
+#)
+#
+#m5 <- glmmTMB(
+#  cbind(number_campelen, number_engel) ~ 0 + s(bin, bs = "cr"),
+#  data = set_pair2,
+#  offset = log(offset_ratio),
+#  family = betabinomial(),
+#  REML = TRUE
+#)
+#
+#m6 <- glmmTMB(
+#  cbind(number_campelen, number_engel) ~ 0 + s(bin, bs = "cr") + (1 | id),
+#  data = set_pair2,
+#  offset = log(offset_ratio),
+#  family = binomial(),
+#  REML = TRUE
+#)
 
-m2 <- glmmTMB(
-  cbind(number_campelen, number_engel) ~ 1,
-  data = set_pair2,
-  offset = log(offset_ratio),
-  family = betabinomial()
-)
 
-m3 <- glmmTMB(
+set_pair_sdm <- set_pair2 %>%
+  mutate(X = rnorm(nrow(.)), Y = rnorm(nrow(.)), id = factor(id))
+
+m3 <- sdmTMB(
   cbind(number_campelen, number_engel) ~ 1 + (1 | id),
-  data = set_pair2,
-  offset = log(offset_ratio),
-  family = binomial()
-)
-
-m4 <- glmmTMB(
-  cbind(number_campelen, number_engel) ~ 0 + s(bin, bs = "cr"),
-  data = set_pair2,
-  offset = log(offset_ratio),
+  mesh = set_pair_sdm %>% make_mesh(xy_cols = c("X", "Y"), n_knots = 10),
+  spatial = "off",
+  spatiotemporal = "off",
+  data = set_pair_sdm,
+  offset = log(set_pair_sdm$offset_ratio),
   family = binomial(),
-  REML = TRUE
+  control = sdmTMBcontrol(multiphase = FALSE)
 )
 
-m5 <- glmmTMB(
-  cbind(number_campelen, number_engel) ~ 0 + s(bin, bs = "cr"),
-  data = set_pair2,
-  offset = log(offset_ratio),
-  family = betabinomial(),
-  REML = TRUE
-)
-
-m6 <- glmmTMB(
-  cbind(number_campelen, number_engel) ~ 0 + s(bin, bs = "cr") + (1 | id),
-  data = set_pair2,
-  offset = log(offset_ratio),
+m6 <- sdmTMB(
+  cbind(number_campelen, number_engel) ~ s(bin, bs = "cr") + 0 + (1 | id),
+  mesh = set_pair_sdm %>% make_mesh(xy_cols = c("X", "Y"), n_knots = 10),
+  spatial = "off",
+  spatiotemporal = "off",
+  data = set_pair_sdm,
+  offset = log(set_pair_sdm$offset_ratio),
   family = binomial(),
-  REML = TRUE
+  control = sdmTMBcontrol(multiphase = FALSE)
 )
 
-# m6 has the best deviance score but poorest residual behavior. Thus, proceed with m3 (constant rho by size)
+extra_bin <- setdiff(1:200, unique(set_pair_sdm$bin))
+
+m7 <- sdmTMB(
+  cbind(number_campelen, number_engel) ~ 0,
+  mesh = set_pair_sdm %>% make_mesh(xy_cols = c("X", "Y"), n_knots = 10),
+  time = "bin",
+  time_varying = ~ 1,
+  time_varying_type = "rw0",
+  extra_time = extra_bin,
+  spatial = "off",
+  spatiotemporal = "off",
+  data = set_pair_sdm,
+  offset = log(set_pair_sdm$offset_ratio),
+  family = binomial(),
+  control = sdmTMBcontrol(multiphase = FALSE)
+)
+
+m8 <- sdmTMB(
+  cbind(number_campelen, number_engel) ~ 0 + (1 | id),
+  mesh = set_pair_sdm %>% make_mesh(xy_cols = c("X", "Y"), n_knots = 10),
+  time = "bin",
+  time_varying = ~ 1,
+  time_varying_type = "rw",
+  extra_time = extra_bin,
+  spatial = "off",
+  spatiotemporal = "off",
+  data = set_pair_sdm,
+  offset = log(set_pair_sdm$offset_ratio),
+  family = binomial(),
+  control = sdmTMBcontrol(multiphase = FALSE)
+)
+
 # From m3: log_rho = 0.9107, SE = 0.0638
-AIC(m, m2, m3, m4, m5, m6)
-sapply(list(m, m2, m3, m4, m5, m6), deviance)
+AIC(m3, m6, m7, m8)
+sapply(list(m3, m6, m7, m8), deviance)
 
 
-resid6 <- simulateResiduals(m6, n = 500)
+#resid6 <- simulateResiduals(m6, n = 500) # glmmTMB
+
+resid6 <- DHARMa::createDHARMa( # sdmTMB
+  simulate(m6, n = 500),
+  observedResponse = m6$response[, 1],
+  fittedPredictedResponse = fitted(m6),
+  integerResponse = TRUE
+)
+
 plot(resid6)
 testDispersion(resid6)
 testOutliers(resid6)
@@ -170,25 +236,22 @@ testDispersion(resid3)
 testResiduals(resid3)
 testOverdispersion(resid3)
 
+resid8 <- DHARMa::createDHARMa(
+  simulate(m8, n = 500),
+  observedResponse = m8$response[, 1],
+  fittedPredictedResponse = fitted(m8),
+  integerResponse = TRUE
+)
+plot(resid8)
+testDispersion(resid8)
+testResiduals(resid8)
+testOverdispersion(resid8)
 
-plot_rho <- function(m, bin = seq(0, 200, 1)) {
-  est <- data.frame(bin = bin, offset_ratio = 1, id = NA)
-  pred <- predict(m, est, re.form = NULL, se.fit = TRUE, cov.fit = TRUE)
-
-  est$log_rho <- pred$fit
-  est$se <- pred$se.fit
-  g <- est %>%
-    mutate(rho = exp(log_rho)) %>%
-    ggplot(aes(bin)) +
-    geom_line(aes(y = log_rho)) +
-    geom_line(aes(y = log_rho + 1.96 * se), linetype = 2) +
-    geom_line(aes(y = log_rho - 1.96 * se), linetype = 2) +
-    labs(x = "Length", y = expression(log(rho)))
-  g
-}
+source("99-functions.R")
 g <- rbind(
-  plot_rho(m3) %>% getElement("data") %>% mutate(Model = "Constant rho"),
-  plot_rho(m6) %>% getElement("data") %>% mutate(Model = "Rho by size")
+  plot_rho_size(m3) %>% getElement("data") %>% mutate(Model = "Constant"),
+  plot_rho_size(m6) %>% getElement("data") %>% mutate(Model = "GAM"),
+  plot_rho_size(m8) %>% getElement("data") %>% mutate(Model = "RW")
 ) %>%
   mutate(rho = exp(log_rho)) %>%
   ggplot(aes(bin, colour = Model)) +

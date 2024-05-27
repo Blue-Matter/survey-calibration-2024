@@ -52,6 +52,8 @@ make_design_index <- function(dat) {
 
   index_design <- dat %>%
     filter(!is.na(strat.area)) %>%
+    summarise(number = sum(number),
+              .by = c(year, strat, strat.area, vessel, trip, set, swept.area)) %>%
     summarise(
       index_strat = mean(number),
       var_strat = var(number),
@@ -126,7 +128,34 @@ do_retrospective <- function(yret, dat, sp, cpus = length(yret)) {
   return(fit_list)
 }
 
+do_null_test <- function(ydummy, dat, sp, cpus = length(ydummy)) {
+  require(snowfall)
 
+  snowfall::sfInit(TRUE, cpus = cpus)
+  sfExport(list = "fit_sdmTMB")
+  on.exit(snowfall::sfStop())
+
+  fit_list <- sfLapply(ydummy, function(y, dat) {
+
+    if (!is.na(y)) {
+      dat_fit <- dplyr::mutate(dat, dummy = year >= y)
+      fit <- fit_sdmTMB(
+        dat_fit,
+        number ~ poly(log_depth, 2, raw = TRUE) + dummy
+      )
+    } else {
+      dat_fit <- dat
+      fit <- fit_sdmTMB(
+        dat_fit,
+        number ~ poly(log_depth, 2, raw = TRUE)
+      )
+    }
+    saveRDS(fit, file = paste0("validation/models/", sp, "_null_fit_", y, ".rds"))
+    return(fit)
+  }, dat = dat)
+
+  return(fit_list)
+}
 
 do_retrospective_gap <- function(gap = 0, yret = max(dat$year), dat, sp, year_new_vessel = 1995, cpus = length(gap)) {
 
@@ -198,3 +227,32 @@ get_vessel_effect <- function(fit_list) {
   return(vessel_effect)
 }
 
+
+plot_rho_size <- function(m, bin = seq(1, 200, 1)) {
+
+  est <- data.frame(bin = bin, offset_ratio = 1, id = factor(NA))
+
+  if (inherits(m, "glmmTMB")) {
+
+    pred <- predict(m, est, re.form = NULL, se.fit = TRUE, cov.fit = TRUE)
+    est$log_rho <- pred$fit
+    est$se <- pred$se.fit
+
+  } else if (inherits(m, "sdmTMB")) {
+
+    est <- predict(m, est, re_form = NA, re_form_iid = ~ 0, se_fit = TRUE) %>%
+      rename(log_rho = est, se = est_se)
+
+  } else {
+    stop("No predict function written for object m")
+  }
+
+  g <- est %>%
+    mutate(rho = exp(log_rho)) %>%
+    ggplot(aes(bin)) +
+    geom_line(aes(y = log_rho)) +
+    geom_line(aes(y = log_rho + 1.96 * se), linetype = 2) +
+    geom_line(aes(y = log_rho - 1.96 * se), linetype = 2) +
+    labs(x = "Length", y = expression(log(rho)))
+  g
+}
