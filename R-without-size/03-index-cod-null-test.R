@@ -26,11 +26,12 @@ dat_fit <- filter(dat, year >= 1995) %>%
   mutate(after2005 = year > 2005)
 
 source("99-functions.R")
-fit <- fit_sdmTMB(dat_fit,
-                  number ~ poly(log_depth, 2, raw = TRUE) + after2005
-                  )
-saveRDS(fit, "validation/models/cod_fit_null.rds")
-fit <- readRDS("validation/models/cod_fit_null.rds")
+fit_null <- fit_sdmTMB(
+  dat_fit,
+  number ~ poly(log_depth, 2, raw = TRUE) + after2005
+)
+saveRDS(fit_null, "validation/models/cod_fit_null.rds")
+fit_null <- readRDS("validation/models/cod_fit_null.rds")
 
 grid <- readr::read_csv("shapefiles/prediction_grid.csv") %>%
   mutate(X = 1e-3 * X, Y = 1e-3 * Y,
@@ -41,7 +42,7 @@ grid <- readr::read_csv("shapefiles/prediction_grid.csv") %>%
          data.series = "Campelen",
          after2005 = TRUE)
 
-index_null <- make_index(fit, grid)
+index_null <- make_index(fit_null, grid)
 readr::write_csv(index_null, "validation/index/cod_index_null.csv")
 index_null <- readr::read_csv("validation/index/cod_index_null.csv")
 

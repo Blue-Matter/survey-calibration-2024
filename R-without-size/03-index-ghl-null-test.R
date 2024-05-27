@@ -45,3 +45,14 @@ index_null <- make_index(fit_null, grid)
 readr::write_csv(index_null, "validation/index/ghl_index_null.csv")
 index_null <- readr::read_csv("validation/index/ghl_index_null.csv")
 
+
+g <- ggplot(index_null, aes(year, est)) +
+  geom_point() +
+  geom_line() +
+  expand_limits(y = 0) +
+  geom_vline(xintercept = 1994.5, linetype = 2) +
+  labs(x = "Year", y = "Campelen Index", colour = "Terminal year") +
+  guides(colour = "none") +
+  theme(panel.spacing = unit(0, "in"))
+.ggsave("index_null.png", g, height = 3.5, width = 6)
+
