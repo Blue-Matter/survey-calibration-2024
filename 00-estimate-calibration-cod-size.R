@@ -219,6 +219,31 @@ g <- ggplot(set_len, aes(bin, value, colour = gear)) +
   labs(x = "Length", y = "Frequency", colour = "Gear")
 ggsave("validation_size/figures/cod_CF_lengthcomp.png", g, width = 6, height = 3.5)
 
+set_cumulative <- set_len %>%
+  arrange(bin) %>%
+  mutate(
+    Rel = value/sum(value),
+    Cumulative = cumsum(value)/sum(value), .by = c(vessel, gear)
+  ) %>%
+  select(bin, gear, Rel, Cumulative) %>%
+  reshape2::melt(id.vars = c("gear", "bin"))
+
+g <- set_cumulative %>%
+  #filter(variable == "Rel") %>%
+  mutate(variable = ifelse(variable == "Rel", "Proportion", "Cumulative frequency")) %>%
+  ggplot(aes(bin, value, colour = gear)) +
+  geom_line() +
+  facet_grid(vars(variable), scales = "free_y", switch = "both") +
+  coord_cartesian(xlim = c(0, 100)) +
+  labs(x = "Length", y = NULL, colour = "Gear") +
+  guides(linetype = "none") +
+  theme(
+    panel.spacing = unit(0, "in"),
+    strip.background = element_rect(fill = NA, colour = NA),
+    strip.placement = "outside"
+  )
+ggsave("validation_size/figures/cod_CF_cumlengthcomp.png", g, width = 5.5, height = 5)
+
 
 set_pair_fn <- function(i) {
 
