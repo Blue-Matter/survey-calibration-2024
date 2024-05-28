@@ -168,7 +168,7 @@ g <- ggplot(index_ret, aes(year, est, colour = factor(year_ret))) +
   geom_vline(xintercept = 1994.5, linetype = 2) +
   labs(x = "Year", y = "Campelen Index", colour = "Terminal year") +
   guides(colour = "none") +
-  theme(panel.spacing = unit(0, "in"))
+  theme(panel.spacing = unit(0, "in"), strip.background = element_rect(fill = NA, colour = NA))
 .ggsave("index_retrospective_ci.png", g, height = 3.5, width = 6)
 
 
@@ -207,6 +207,21 @@ g <- ggplot(index_gap, aes(year, log(est))) +
   guides(shape = "none") +
   labs(x = "Year", y = "Campelen log(Index)", colour = "Survey gap")
 .ggsave("index_gap2.png", g, height = 3, width = 6)
+
+g <- index_gap %>%
+  mutate(gap = paste(gap, "year gap")) %>%
+  ggplot(aes(year, est, colour = factor(gap), shape = impute, group = factor(gap))) +
+  geom_point() +
+  geom_line(linewidth = 0.5) +
+  geom_linerange(aes(ymin = lwr, max = upr), linewidth = 0.25) +
+  expand_limits(y = 0) +
+  facet_wrap(vars(gap)) +
+  geom_vline(xintercept = 1994.5, linetype = 2) +
+  labs(x = "Year", y = "Campelen Index", colour = "Terminal year") +
+  guides(colour = "none", shape = "none") +
+  scale_shape_manual(values = c(16, 1)) +
+  theme(panel.spacing = unit(0, "in"), strip.background = element_rect(fill = NA, colour = NA))
+.ggsave("index_gap_ci.png", g, height = 3.5, width = 6)
 
 vessel_effect <- get_vessel_effect(fit_gap)
 

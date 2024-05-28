@@ -58,6 +58,21 @@ g <- index_null %>%
   theme(panel.spacing = unit(0, "in"))
 .ggsave("index_null.png", g, height = 3.5, width = 6)
 
+g <- index_null %>%
+  filter(!is.na(ydummy)) %>%
+  mutate(ydummylabel = paste(ydummy, "dummy change")) %>%
+  ggplot(aes(year, est, colour = ydummylabel, shape = year < ydummy)) +
+  geom_point() +
+  geom_line() +
+  geom_linerange(aes(ymin = lwr, ymax = upr)) +
+  facet_wrap(vars(ydummylabel)) +
+  expand_limits(y = 0) +
+  guides(colour = "none", shape = "none") +
+  scale_shape_manual(values = c(16, 1)) +
+  labs(x = "Year", y = "Campelen Index", colour = "Dummy year change") +
+  theme(panel.spacing = unit(0, "in"), strip.background = element_rect(fill = NA, colour = NA))
+.ggsave("index_null_ci.png", g, height = 3.5, width = 6)
+
 vessel_effect <- get_vessel_effect(fit_null[1:6]) %>%
   mutate(ydummy = .env$ydummy[1:6])
 
