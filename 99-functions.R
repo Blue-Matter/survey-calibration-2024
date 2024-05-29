@@ -48,32 +48,104 @@ expand_number_len <- function(dat_lf, dat_rho, length_bin) {
   return(dout)
 }
 
-make_design_index <- function(dat) {
+make_design_index <- function(dat, simsurvey = FALSE) {
 
-  index_design <- dat %>%
+  set_df <- dat %>%
     filter(!is.na(strat.area)) %>%
-    summarise(number = sum(number),
-              .by = c(year, strat, strat.area, vessel, trip, set, swept.area)) %>%
     summarise(
-      index_strat = mean(number),
-      var_strat = var(number),
-      n = n(),
-      nsamp = unique(strat.area)/mean(swept.area),
-      .by = c(year, strat, strat.area)
-    ) %>%
-    mutate(var_strat = ifelse(is.na(var_strat), 0, var_strat)) %>%
-    mutate(area_total = sum(strat.area), .by = year) %>%
-    summarise(
-      est = sum(index_strat * nsamp),
-      var = sum(nsamp * (nsamp - n)/n * var_strat)/sum(nsamp)/sum(nsamp), # See SimSurvey appendix
-      .by = year
-    ) %>%
-    mutate(
-      se = sqrt(var),
-      cv = se/est,
-      lwr = est - 1.96 * se,
-      upr = est + 1.96 * se
+      number = sum(number),
+      .by = c(year, strat, strat.area, vessel, trip, set, swept.area)
     )
+
+  if (simsurvey) {
+
+
+    require(data.table)
+
+    # Copied from SimSurvey::strat_means
+    strat_means <- function(data = NULL, metric = NULL, strat_groups = NULL, survey_groups = NULL, confidence = 95) {
+      require(data.table)
+      Nh <- strat_area <- tow_area <- Wh <- total <- sumYh <- nh <- gh <- meanYh <- varYh <- meanYst_lcl <- meanYst <- varYst <- df <- meanYst_ucl <- sumYst <- N <- sumYst_lcl <- sumYst_ucl <- NULL
+      lc <- (100 - confidence)/200
+      uc <- (100 - confidence)/200 + (confidence/100)
+      d <- copy(data)
+      d <- d[, c(strat_groups, metric), with = FALSE]
+      setnames(d, names(d), c(strat_groups, "metric"))
+      setkeyv(d, strat_groups)
+      strat_tab <- d[, list(sumYh = sum(metric), meanYh = mean(metric),
+                            varYh = stats::var(metric), nh = .N), by = strat_groups]
+      strat_tab$varYh <- ifelse(strat_tab$nh == 1, 0, strat_tab$varYh)
+      strat_tab[, `:=`(Nh, strat_area/tow_area)]
+      strat_tab[, `:=`(Wh, Nh/sum(Nh)), by = survey_groups]
+      strat_tab[, `:=`(total, Nh * sumYh/nh)]
+      strat_tab[, `:=`(gh, Nh * (Nh - nh)/nh)]
+      survey_tab <- strat_tab[, list(n = sum(nh), N = sum(Nh),
+                                     meanYst = sum(Wh * meanYh), varYst = (1/((sum(Nh))^2)) *
+                                       sum(gh * varYh), df = ((sum(gh * varYh))^2)/(sum((gh^2 *
+                                                                                           varYh^2)/(nh - 1)))), by = survey_groups]
+
+      # Use qnorm() instead of qt() because df is NA (1 set in many strata)
+      survey_tab[, `:=`(meanYst_lcl, (meanYst - (sqrt(varYst)) *
+                                        abs(stats::qnorm(lc))))]
+      survey_tab[, `:=`(meanYst_ucl, (meanYst + (sqrt(varYst)) *
+                                        abs(stats::qnorm(lc))))]
+      survey_tab[, `:=`(sumYst, N * meanYst)]
+      survey_tab[, `:=`(sumYst_lcl, (sumYst - abs(stats::qnorm(lc)) * N * sqrt(varYst)))]
+      survey_tab[, `:=`(sumYst_ucl, (sumYst + abs(stats::qnorm(lc)) * N * sqrt(varYst)))]
+      survey_tab[sapply(survey_tab, is.nan)] <- NA
+
+      survey_tab <- survey_tab[, c(survey_groups, "n", "N", "df",
+                                   "varYst", "meanYst", "meanYst_lcl", "meanYst_ucl", "sumYst",
+                                   "sumYst_lcl", "sumYst_ucl"), with = FALSE]
+      survey_tab$varYst <- sqrt(survey_tab$varYst)
+      setnames(survey_tab, names(survey_tab), c(survey_groups,
+                                                "sets", "sampling_units", "df", "sd", "mean", "mean_lcl",
+                                                "mean_ucl", "total", "total_lcl", "total_ucl"))
+      survey_tab
+    }
+
+    do_simsurvey <- set_df %>%
+      rename(strat_area = strat.area) %>%
+      mutate(tow_area = swept.area) %>%
+      #mutate(tow_area = swept.area/1e3) %>%
+      #select(year, set, strat, strat_area, bin, number.calibrate, tow_area) %>%
+      data.table::as.data.table() %>%
+      strat_means(
+        metric = "number",
+        strat_groups = c("year", "strat", "strat_area", "tow_area"),
+        survey_groups = "year"
+      )
+
+    index_design <- do_simsurvey %>%
+      as.data.frame() %>%
+      rename(se = sd, est = total, lwr = total_lcl, upr = total_ucl) %>%
+      mutate(cv = se/est)
+
+  } else {
+
+    index_design <- set_df %>%
+      summarise(
+        index_strat = mean(number),
+        var_strat = var(number),
+        n = n(),
+        nsamp = unique(strat.area)/mean(swept.area),
+        .by = c(year, strat, strat.area)
+      ) %>%
+      mutate(var_strat = ifelse(is.na(var_strat), 0, var_strat)) %>%
+      mutate(area_total = sum(strat.area), .by = year) %>%
+      summarise(
+        est = sum(index_strat * nsamp),
+        var = sum(nsamp * (nsamp - n)/n * var_strat)/sum(nsamp)/sum(nsamp), # See SimSurvey appendix
+        .by = year
+      ) %>%
+      mutate(
+        se = sqrt(var),
+        cv = se/est,
+        lwr = est - 1.96 * se,
+        upr = est + 1.96 * se
+      )
+
+  }
   return(index_design)
 }
 
