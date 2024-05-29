@@ -1,0 +1,30 @@
+<!-- The following code should appear at the beginning of the first appendix.
+After that, all subsequent sections will be turned into appendices. -->
+
+\newpage
+
+# Appendix A {#app:appendix-a}
+
+```{r null-ci-ghl, fig.cap="Greenland halibut index series (1995--2020) with 95 percent confidence intervals when the model assumes a gear change when no change actually occurred. Open and closed circles separate years before and after the dummy gear change."}
+knitr::include_graphics(here::here("validation/figures/ghl_index_null_ci.png"))
+```
+
+```{r null-ci-cod, fig.cap="Atlantic cod index series (1995--2020) with 95 percent confidence intervals when the model assumes a gear change when no change actually occurred. Open and closed circles separate years before and after the dummy gear change."}
+knitr::include_graphics(here::here("validation/figures/cod_index_null_ci.png"))
+```
+
+```{r ret-rho-ghl, fig.cap="Estimates of rho for Greenland halibut as the time gap between gears increases. The horizontal dotted line and grey band indicates the point estimate and the 95 percent confidence interval of rho from comparative fishing."}
+knitr::include_graphics(here::here("validation/figures/ghl_gap_vessel_effect.png"))
+```
+
+```{r ret-rho-cod, fig.cap="Estimates of rho for Atlantic cod as the time gap between gears increases. The horizontal dotted line and grey band indicates the point estimate and the 95 percent confidence interval of rho from comparative fishing."}
+knitr::include_graphics(here::here("validation/figures/cod_gap_vessel_effect.png"))
+```
+
+```{r gap-ci-ghl, fig.cap="Greenland halibut index series (1985--2020) with 95 percent confidence intervals as the time gap between vessels increases. Empty circles indicate years when data were excluded from the model, which imputed values through the data gap. The confidence interval is higher for missing years and the pre-1995 index than post-1995 due to the uncertainty of the rho estimate."}
+knitr::include_graphics(here::here("validation/figures/ghl_index_gap_ci.png"))
+```
+
+```{r gap-ci-cod, fig.cap="Atlantic cod index series (1985--2020) with 95 percent confidence intervals as the time gap between vessels increases. Empty circles indicate years when data were excluded from the model, which imputed values through the data gap. The confidence interval is higher for missing years and the pre-1995 index than post-1995 due to the uncertainty of the rho estimate."}
+knitr::include_graphics(here::here("validation/figures/cod_index_gap_ci.png"))
+```

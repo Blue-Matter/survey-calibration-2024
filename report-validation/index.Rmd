@@ -1,0 +1,59 @@
+---
+title: "Exploring spatiotemporal models for abundance indices from two gears in the absence of comparative fishing"
+author: "Quang C. Huynh^1^, Kevin J. Hedges^2^"
+
+# There is currently no affiliation section for Rmarkdown word output, 
+# so augment the date sction with affiliations
+date: | 
+    ^1^Blue Matter Science\
+    2150 Bridgman Ave\
+    North Vancouver, British Columbia, Canada, V7P 2T9\
+    \
+    ^2^Fisheries and Oceans Canada\
+    Freshwater Institute\
+    501 University Cres.\
+    Winnipeg, Manitoba, Canada R3T 2N6\
+    \
+    `r format(Sys.time(), "%Y-%m-%d")` 
+abstract: |
+  Here is the abstract text.
+output: NAFOdown::word_scr
+
+# ------------
+# End of options to set
+knit: bookdown::render_book
+link-citations: true
+bibliography: refs.bib
+csl: csl/apa-no-ampersand.csl
+---
+
+```{r setup, echo=FALSE, cache=FALSE, message=FALSE, results='hide', warning=FALSE}
+# adjust as desired:
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  comment = "#>",
+  fig.path = "knitr-figs-docx/",
+  cache.path = "knitr-cache-docx/",
+  fig.height = NAFOdown::.nafo_height,
+  fig.width = NAFOdown::.nafo_width, 
+  fig.showtext = TRUE,
+  echo = FALSE,
+  # autodep = TRUE,
+  # cache = TRUE,
+  cache.comments = FALSE,
+  dev = "png",
+  dpi = 300
+)
+showtext::showtext_opts(dpi = knitr::opts_chunk$get()$dpi) # force showtext dpi to match chunk dpi to preserve proper font size (9 pt)
+flextable::set_flextable_defaults(font.family = "Cambria") # ensure that all parts of flextable tables use Cambria font
+```
+
+```{r load-libraries, cache=FALSE}
+# add other packages here:
+library(NAFOdown)
+#library(ggplot2)
+#library(flextable)
+#theme_set(theme_nafo()) # set default ggplot2 theme
+```

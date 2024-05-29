@@ -1,0 +1,196 @@
+
+# Introduction
+
+Catch advice to NAFO Subarea 0/1 (Offshore) Greenland halibut (GHL, *Reinhardtius hippoglossoides*) has been provided through a bottom trawl survey in Divisions 0A and 1CD.
+In 2019, the research vessel (RV) Paamiut that executed the survey was decommissioned ahead of schedule. 
+The survey did not continue until 2022 with a new vessel RV Tarajoq. 
+Currently, more time is needed to build the new index series from the RV Tarajoq.
+
+Indices could be joined across vessels if differences in gear catchability ($\rho$) can be estimated for the new vessel or gear relative to the old one. 
+Best practice entails conducting comparative fishing (CF) experiments where paired sets from the two vessels are made to allow comparison of catch rates in the same space and time. 
+However, comparative fishing was not possible for the Paamiut and Tarajoq.
+
+This paper evaluates the potential to use spatiotemporal models to stitch indices from separate vessels across different time periods in the absence of CF.
+Spatiotemporal modeling use GLMMs with random effects to account for spatial patterns in stock abundance across time [@thorson2019], and is an increasingly popular and flexible approach to standardizing indices of abundance.
+For example, spatiotemporal models can impute abundance in unsampled time-area strata for the index calculation, which would otherwise not be possible with the design-based index approach.
+As with any linear model, fixed effects account for habitat or catchability covariates that affect catch rates.
+Here, $\rho$ can be estimated as a fixed effect which can then be used to stitch together the index across vessels.
+
+This approach raises the question of whether $\rho$ can be estimated without CF data.
+However, $\rho$ may be identifiable when a predictive model for the population process over time is included. 
+A simple example in Figure \@ref(fig:simple-example) demonstrates the approach. 
+If the predictive model for the population is a linear model through time and the discontinuity in the series represents a vessel effect, then the offset in the index is estimable as a second intercept. 
+
+With spatiotemporal models, the population process is modeled as a random walk which constrains how much the population abundance is expected change over time, analogous to the linear regression in the simple example.
+Data from the old vessel provides initial information on the random walk for the population. 
+When the model fits to data from the new vessel, major departures from the predicted random walk would be ascribed to the vessel effect.
+
+@huynh2023 demonstrated the approach for Subarea 0/1 (Offshore) GHL for the Paamiut time series and the 2019 survey on the FV Helga Maria.
+Initial results supported the field observation that the trawl on the Helga Maria did not catch small fish as efficiently as on Paamuit at deep depths, and the spatiotemporal model calculated the corresponding index accounting for the gear effect.
+
+Further evaluation is needed to determine if such an approach may be appropriate.
+Here, we explored three research questions:
+
+1. How well does the spatiotemporal model estimate the vessel effect ($\rho$) in the absence of CF?
+2. Is there a retrospective pattern in $\rho$ estimates as the more time series data from the new vessel are collected?
+3. How do $\rho$ estimates change as the time gap between surveys increases?
+
+As part of a validation exercise, we explore performance of the spatiotemporal models with the trawl survey data in Newfoundland and Labrador and compare indices of abundance that included or excluded the CF study in 1995.
+
+# Methods
+
+## Comparative fishing
+
+The Newfoundland and Labrador trawl survey used the Gadus Atlantica vessel with the Engel trawl prior to 1995 and was replaced by the Teleost with the Campelen gear. 
+Using Atlantic cod *Gadus morhua* and Greenland halibut as the two case studies, paired vessel tows in 1995 in Divisions 3LNOP were used to estimate the gear efficiency of the Campelen relative to the Engel.
+A more thorough description of the survey and CF data is available in @cadigan2023.
+
+Following the binomial GLM approach, the catch in total numbers per set pair $j$ was modeled as
+
+$$
+\textrm{logit}\left(\dfrac{C_{1,j}}{C_{1,j} + C_{2,j}}\right) = \log\rho + \log(A_{1,j}/A_{2,j}) + \delta_j
+$$
+
+where $C$ is the catch from for gears 1 and 2 (Campelen and Engel, respectively) and $A$ is the swept area.
+On the right-hand side of the equation, the first term is the intercept, the second term is the offset, and $\delta$ is a random effect by set pair. The derivation is available in @miller2013. 
+
+## Spatiotemporal modeling
+
+Indices of abundance were developed for the two species in 2J+3KL from 1985--2020. 
+These areas had the longest survey time series, with overlap in 3L for the comparative fishing.
+The Engel time series for 2J3K started in 1978, but 3L was not sampled until 1985. 
+The survey expanded into 3NO in 1990. 
+Division 3L was not sampled in 2021 and a subsequent vessel change was made thereafter.
+
+Four sets of model fits were developed in this study. No CF data were included in any of these models.
+
+The first comparison used the 1985--2020 data to develop three sets of indices based on various configurations of the spatiotemporal model:
+
+1. Expanding the pre-1995 Engel catch by $\rho$ estimated from the CF data ("Comparative rho")
+2. Estimating the gear effect for the Campelen catch ("Estimate rho"). This is the proposed approach we wish to use to calibrate the survey gear.
+3. No consideration to vessel effects ("No rho").
+
+Models were fitted with the sdmTMB R package [@anderson2022], with a random walk in the spatiotemporal random field.
+The negative binomial distribution was used for the likelihood with a log link function. 
+Thus, the fixed effect estimated corresponding to the vessel effect is interpreted as $\log\rho$.
+After model fitting, the index was generated by predicting the annual abundance across 25 sq. km. grid cells spanning the survey domain. 
+Pre-1995 index values are the Campelen equivalent had the gear been used.
+
+The second analysis implemented a null test for the Campelen data series (1995--2020). A series of models were configured to estimate a gear effect starting in different years, from 2005 up to 2010.
+The model is expected to estimated a fixed effect that is not significantly different from zero.
+
+The third analysis explores the retrospective behavior of the spatiotemporal model with an estimated gear effect as the new series builds. 
+The series of models fit to the full Engel series, and increasing number of years of the Campelen series from 1--5 years (1995--2000).
+
+The fourth analysis explores the estimated gear effect as the survey gap between gears increases from 1--5 years. 
+The series of models fit to the full Engel series, and the initial data from the Campelen series are excluded.
+
+# Results
+
+Estimates of $\rho$ are in Table \@ref(tab:rho). 
+All values are positive, indicating higher catchability of the Campelen gear due to the smaller mesh size.
+The nominal index increases when no vessel effect is considered (Figures \@ref(fig:index-ghl) - \@ref(fig:index-cod)).
+Values for cod between the CF data and the spatiotemporal model were similar in magnitude despite use of different data.
+Indices from either value of $\rho$ bridges the index across the vessel change and reduces the offset in index values.
+When $\rho$ is estimated in the spatiotemporal model, the standard error in $\log\rho$ generates larger confidence intervals into pre-1995 index values compared to post-1995 values (via the delta method).
+
+On the other hand, $\rho$ was higher in the spatiotemporal model than with the CF data for GHL. 
+A large increase in the index occurs in the first two years (1995--1996) of the new vessel, and the spatiotemporal model stitches the index across the vessel change to the first year of the new series (1995). 
+The smaller comparative $\rho$ creates a larger increase in the index through 1994--1996.
+
+The spatiotemporal model was able to estimate a gear effect of effectively zero successfully in almost all cases in the null test, where the 95 percent confidence interval for $\log\rho$ included zero (Figures \@ref(fig:null-rho-ghl)--\@ref(fig:null-rho-cod)). 
+The corresponding indices are shown in Appendix A.
+
+There was minimal retrospective trend at the beginning of the index series for the new vessel (Figures \@ref(fig:ret-ghl) -- \@ref(fig:ret-cod)). The magnitude of the pre-1995 index did not appreciably change, indicating that the estimates of rho were consistent as more data were added to the model (Appendix A).
+
+The length of the time gap between survey gears had the most impact on index trends (Figure \@ref(fig:gap-ghl) -- \@ref(fig:gap-cod)). 
+There was notable variability in rho estimates, although without any systematic trend. 
+The standard error increased as the gap increased (Figure \@ref(fig:gap-rho-ghl) -- \@ref(fig:gap-rho-cod)), and increase the error bars in the pre-1995 index (Appendix A).
+
+# Discussion
+
+Empirical data from comparative fishing is desirable over survey calibration through spatiotemporal modeling, but the latter may be be a suitable alternative if CF is not possible or available.
+The comparison between rho estimated from CF and in spatiotemporal models without CF indicates promising potential for the latter.
+Rho estimates for cod were very similar despite estimation from two separate datasets. 
+The spatiotemporal model performed favorably with respect to the null test and the retrospective analysis.
+
+The time gap between surveys had a notable impact on model results and will be an important consideration for Subarea 0/1 GHL, for which there is a four year time gap.
+In general, small differences in rho estimates do create noticeable differences in the point estimate of the index. However, significant overlap in the error bars of the indices which can be indicative of the stability in the model in the various scenarios explored here.
+
+Further advice on the suitability on the spatiotemporal modeling approach for survey calibration would require simulation testing to characterize the error in rho estimates across a variety of situations and life histories. 
+The stock trend may also play a role in the performance of the spatiotemporal model. 
+There were strong year effects for Atlantic cod while there was less contrast in the abundance of Greenland halibut.
+
+We applied the spatiotemporal model and estimated gear effects aggregated across all size classes. 
+The gold-standard for survey calibration is size-structured as catchability differences in fishing gears alters the size composition of fish caught. 
+The comparison between indices from spatiotemporal models and CF can be size-aggregated.
+A separate spatiotemporal model can be fitted for each size class, as demonstrated in @huynh2023 for survey calibration by size class and in @thorson2019comp for fitting to size composition data in general. 
+While rho can be estimated from comparative fishing at a fine resolution, e.g., 1 cm bins, it is desirable to use as few size bins as necessary for the spatiotemporal model due to the computation time.
+
+\newpage
+
+# Tables
+
+```{r rho, results="asis"}
+rho <- tibble::tibble(
+  Stock = c("GHL", "Cod"),
+  Comparative = c("0.891 (0.062)", "2.072 (0.082)"),
+  Spatiotemporal = c("1.427 (0.256)", "2.175 (0.383)")
+)
+knitr::kable(
+  rho, 
+  align = "r",
+  caption = "Estimates of log rho from the comparative fishing (CF) data and from the spatiotemporal model (excluding CF sets). Standard errors are in parentheses."
+)
+```
+
+\newpage
+
+# Figures
+
+```{r simple-example, fig.cap="Simple example of the regression discontinuity problem as applied to index standardization across gears. The dotted line indicates a survey gear change and is realized through the break in the time series. If the population process is constrained in a model, i.e., a linear regression with constant slope across the gear change, then the gear effect is identifiable without comparative fishing sets. Spatiotemporal modeling utilizes a similar approach to estimate the gear effect, where a random walk in the spatiotemporal field is analogous to the linear regression of this example."}
+knitr::include_graphics(here::here("validation/figures/example.png"))
+```
+
+```{r index-ghl, fig.cap="Comparison of three indices for 2J3KL Greenland halibut, with 95 percent confidence intervals. Post-1995 values (right of the vertical, dashed line) are identical in all panels. Pre-1995 values are the Campelen equivalent had the gear operated. In the middle panel, pre-1995 index values have larger standard errors when the model estimates the gear effect."}
+knitr::include_graphics(here::here("validation/figures/ghl_index_no_comparative_ci.png"))
+```
+
+```{r index-cod, fig.cap="Comparison of three indices for 2J3KL Atlantic cod. See caption in previous figure for description."}
+knitr::include_graphics(here::here("validation/figures/cod_index_no_comparative_ci.png"))
+```
+
+```{r null-rho-ghl, fig.cap="Estimates of log rho for Greenland halibut in the null test by configuring the spatiotemporal model to estimate the gear effect when no gear change actually occurred in the 1995--2020 survey. Dummy year indicates when the model was configured to assume the gear change was made. Ideally, the estimates are not significantly different from zero (dotted horizontal line). The vertical line spans the 95 percent confidence interval."}
+knitr::include_graphics(here::here("validation/figures/ghl_null_vessel_effect.png"))
+```
+
+```{r null-rho-cod, fig.cap="Estimates of log rho for Atlantic cod in the null test by configuring the spatiotemporal model to estimate the gear effect when no gear change actually occurred in the 1995--2020 survey. Dummy year indicates when the model was configured to assume the gear change was made. Ideally, the estimates are not significantly different from zero (dotted horizontal line). The vertical line spans the 95 percent confidence interval."}
+knitr::include_graphics(here::here("validation/figures/cod_null_vessel_effect.png"))
+```
+
+```{r ret-ghl, fig.cap="Retrospective analysis of the index for Greenland halibut as the new survey data series, starting in 1995 (dashed vertical line) expands forward in time. Colours indicate the terminal year of data. A systematic trend in rho estimates would create a corresponding trend in the magnitude of the pre-1995 index. The dark black line is the full index from the comparative rho to expand pre-1995 catch rates."}
+knitr::include_graphics(here::here("validation/figures/ghl_index_retrospective.png"))
+```
+
+```{r ret-cod, fig.cap="Retrospective analysis of the index for Atlantic cod as the new survey data series, starting in 1995 (dashed vertical line) expands forward in time. Colours indicate the terminal year of data. A systematic trend in rho estimates would create a corresponding trend in the magnitude of the pre-1995 index. The dark black line is the full index from the comparative rho to expand pre-1995 catch rates."}
+knitr::include_graphics(here::here("validation/figures/cod_index_retrospective.png"))
+```
+
+```{r gap-ghl, fig.cap="Greenland halibut index series (1985--2020, point estimates only) as the time gap between vessels increases. Empty circles indicate years when data were excluded from the model, which imputed values through the data gap. Differences in scaling in the pre-1995 index is attributed to the magnitude of the gear effect. The dark black line is the full index from the comparative rho to expand pre-1995 catch rates."}
+knitr::include_graphics(here::here("validation/figures/ghl_index_gap.png"))
+```
+
+```{r gap-cod, fig.cap="Atlantic cod index series (1985--2020, point estimates only) as the time gap between vessels increases. Empty circles indicate years when data were excluded from the model, which imputed values through the data gap. Differences in scaling in the pre-1995 index is attributed to the magnitude of the gear effect. The dark black line is the full index from the comparative rho to expand pre-1995 catch rates."}
+knitr::include_graphics(here::here("validation/figures/cod_index_gap.png"))
+```
+
+```{r gap-rho-ghl, fig.cap="Estimates of rho for Greenland halibut as the time gap between gears increases. The horizontal dotted line and grey band indicates the point estimate and the 95 percent confidence interval of rho from comparative fishing."}
+knitr::include_graphics(here::here("validation/figures/ghl_gap_vessel_effect.png"))
+```
+
+```{r gap-rho-cod, fig.cap="Estimates of rho for Atlantic cod as the time gap between gears increases. The horizontal dotted line and grey band indicates the point estimate and the 95 percent confidence interval of rho from comparative fishing."}
+knitr::include_graphics(here::here("validation/figures/cod_gap_vessel_effect.png"))
+```
+
+
+\newpage

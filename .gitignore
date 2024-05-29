@@ -1,1 +1,5 @@
 .Rproj.user
+_book
+csl
+knitr-figs-docx
+.Rhistory
