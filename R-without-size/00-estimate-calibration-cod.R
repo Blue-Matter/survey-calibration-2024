@@ -41,6 +41,7 @@ set_spec <- left_join(
     doorspread = 1e-3 * ifelse(gearname == "Engel", 25.0403, 31.18805),
     swept.area = dist.towed * doorspread
   )
+readr::write_csv(set_spec, file = "validation/cod_set_cf.csv")
 
 trip_pairs <- list(c(5, 253), c(6, 254), c(7, 255))
 
