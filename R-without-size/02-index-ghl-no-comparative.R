@@ -35,7 +35,9 @@ g <- dat %>% summarise(n = n(), .by = c(year, data.series, vessel, NAFOdiv)) %>%
 # Spatial figure of set data
 nfld <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
   sf::st_crop(xmin = -59, xmax = -46, ymin = 45, ymax = 56)
-g <- ggplot(dat) +
+g <- dat %>%
+  filter(set.depth.mean > 1000) %>%
+  ggplot() +
   geom_sf(data = nfld) +
   coord_sf() +
   geom_point(aes(long.start, lat.start, colour = npue), size = 0.5) +
@@ -62,7 +64,9 @@ summarise(dat, n = n(), .by = c(year, vessel, NAFOdiv)) %>%
 g <- ggplot(dat, aes(set.depth.mean, npue, colour = data.series)) +
   geom_point() +
   facet_wrap(vars(year)) +
-  coord_cartesian(xlim = c(0, 800))
+  #coord_cartesian(xlim = c(0, 800)) +
+  geom_vline(xintercept = 1000, linetype = 3) +
+  labs(x = "Depth (m)", y = "NPUE", colour = "Gear")
 
 
 # Data set to fit full model
@@ -83,6 +87,7 @@ saveRDS(fit, "validation/models/ghl_fit_full.rds")
 fit <- readRDS("validation/models/ghl_fit_full.rds")
 
 index <- make_index(fit, grid)
+
 readr::write_csv(index, "validation/index/ghl_index.csv")
 index <- readr::read_csv("validation/index/ghl_index.csv")
 
@@ -94,6 +99,8 @@ readr::write_csv(index_norho, "validation/index/ghl_index_norho.csv")
 index_norho <- readr::read_csv("validation/index/ghl_index_norho.csv")
 
 index_best <- readr::read_csv("validation/index/ghl_index_calibration.csv")
+
+index_cf <- readr::read_csv("validation/index/ghl_index_cf.csv")
 
 index_compare <- rbind(
   index_best %>% mutate(Model = "Comparative rho"),
@@ -289,3 +296,36 @@ g <- rbind(
   scale_shape_manual(values = c(1, 16)) +
   theme(legend.position = "bottom")
 .ggsave("index_design.png", g, height = 4.5, width = 6)
+
+# Explore index about below/above 1000 m
+#pred_1000 <- make_index(fit, grid, pred_only = TRUE)
+#
+#g <- pred_1000$data %>%
+#  mutate(deep = depth > 1e3) %>%
+#  summarise(abun = sum(exp(est) * area_km2), .by = c(year, deep)) %>%
+#  ggplot(aes(year, abun, colour = deep)) +
+#  geom_line() +
+#  geom_point() +
+#  labs(x = "Year", y = "Index", colour = ">1000 m")
+#
+#g1 <- pred_1000$data %>%
+#  mutate(deep = depth > 1e3) %>%
+#  summarise(abun = sum(exp(est) * area_km2), .by = c(year, deep)) %>%
+#  ggplot(aes(year, abun, colour = deep)) +
+#  geom_line() +
+#  #geom_point() +
+#  labs(x = "Year", y = "Index", colour = ">1000 m")
+#
+#g2 <- pred_1000$data %>%
+#  mutate(deep = depth > 1e3) %>%
+#  summarise(abun = sum(exp(est) * area_km2), .by = c(year, deep)) %>%
+#  mutate(p = abun/sum(abun), .by = year) %>%
+#  filter(deep) %>%
+#  ggplot(aes(year, p)) +
+#  geom_line() +
+#  geom_point() +
+#  expand_limits(y = 0) +
+#  labs(x = "Year", y = "Stock proportion >1000 m")
+#
+#g <- cowplot::plot_grid(g1, g2, ncol = 1)
+#ggsave("ghl_index_deep.png", g, height = 5, width = 4)

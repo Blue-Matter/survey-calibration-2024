@@ -91,6 +91,8 @@ index_norho <- readr::read_csv("validation/index/cod_index_norho.csv")
 
 index_best <- readr::read_csv("validation/index/cod_index_calibration.csv")
 
+index_cf <- readr::read_csv("validation/index/cod_index_cf.csv")
+
 index_compare <- rbind(
   index_best %>% mutate(Model = "Comparative rho"),
   index %>% mutate(Model = "Estimate rho"),
