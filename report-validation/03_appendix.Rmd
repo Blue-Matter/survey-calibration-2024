@@ -5,14 +5,6 @@ After that, all subsequent sections will be turned into appendices. -->
 
 # Appendix A {#app:appendix-a}
 
-```{r null-ci-ghl, fig.cap="Greenland halibut index series (1995--2020) with 95 percent confidence intervals when the model assumes a gear change when no change actually occurred. Open and closed circles separate years before and after the dummy gear change."}
-knitr::include_graphics(here::here("validation/figures/ghl_index_null_ci.png"))
-```
-
-```{r null-ci-cod, fig.cap="Atlantic cod index series (1995--2020) with 95 percent confidence intervals when the model assumes a gear change when no change actually occurred. Open and closed circles separate years before and after the dummy gear change."}
-knitr::include_graphics(here::here("validation/figures/cod_index_null_ci.png"))
-```
-
 ```{r ret-rho-ghl, fig.cap="Estimates of rho for Greenland halibut as the time gap between gears increases. The horizontal dotted line and grey band indicates the point estimate and the 95 percent confidence interval of rho from comparative fishing."}
 knitr::include_graphics(here::here("validation/figures/ghl_gap_vessel_effect.png"))
 ```

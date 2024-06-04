@@ -98,8 +98,8 @@ On the other hand, $\rho$ was higher in the spatiotemporal model than with the C
 A large increase in the index occurs in the first two years (1995--1996) of the new vessel, and the spatiotemporal model stitches the index across the vessel change to the first year of the new series (1995). 
 The smaller comparative $\rho$ creates a larger increase in the index through 1994--1996.
 
-The spatiotemporal model was able to estimate a gear effect of effectively zero successfully in almost all cases in the null test, where the 95 percent confidence interval for $\log\rho$ included zero (Figures \@ref(fig:null-rho-ghl)--\@ref(fig:null-rho-cod)). 
-The corresponding indices are shown in Appendix A.
+The spatiotemporal model was able to estimate a gear effect of effectively zero successfully in almost all cases in the null test, where the 95 percent confidence interval for $\log\rho$ included zero (Figures \@ref(fig:null-rho-ghl)--\@ref(fig:null-rho-cod)).
+If it is determined that there is no catchability difference between gears, index standardization would not need to utilize a calibration factor.
 
 There was minimal retrospective trend at the beginning of the index series for the new vessel (Figures \@ref(fig:ret-ghl) -- \@ref(fig:ret-cod)). The magnitude of the pre-1995 index did not appreciably change, indicating that the estimates of rho were consistent as more data were added to the model (Appendix A).
 
@@ -113,6 +113,9 @@ Empirical data from comparative fishing is desirable over survey calibration thr
 The comparison between rho estimated from CF and in spatiotemporal models without CF indicates promising potential for the latter.
 Rho estimates for cod were very similar despite estimation from two separate datasets. 
 The spatiotemporal model performed favorably with respect to the null test and the retrospective analysis.
+
+The retrospective analysis suggests that the model estimates the survey calibration factor primarily from the first year of the new data. It is possible to estimate the calibration factor once and use the same estimate for all subsequent updates of the index.
+However, index standardization would lose the error propagation properties seen here.
 
 The time gap between surveys had a notable impact on model results and will be an important consideration for Subarea 0/1 GHL, for which there is a four year time gap.
 In general, small differences in rho estimates do create noticeable differences in the point estimate of the index. However, significant overlap in the error bars of the indices which can be indicative of the stability in the model in the various scenarios explored here.
