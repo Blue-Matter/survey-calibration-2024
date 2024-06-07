@@ -13,7 +13,7 @@ However, comparative fishing was not possible for the Paamiut and Tarajoq.
 This paper evaluates the potential to use spatiotemporal models to stitch indices from separate vessels across different time periods in the absence of CF.
 Spatiotemporal modeling use GLMMs with random effects to account for spatial patterns in stock abundance across time [@thorson2019], and is an increasingly popular and flexible approach to standardizing indices of abundance.
 For example, spatiotemporal models can impute abundance in unsampled time-area strata for the index calculation, which would otherwise not be possible with the design-based index approach.
-As with any linear model, fixed effects account for habitat or catchability covariates that affect catch rates.
+As with any linear model, fixed effects and additional random effects account for habitat or catchability covariates that affect catch rates [@thorson2019, @thorson2014].
 Here, $\rho$ can be estimated as a fixed effect which can then be used to stitch together the index across vessels.
 
 This approach raises the question of whether $\rho$ can be estimated without CF data.
