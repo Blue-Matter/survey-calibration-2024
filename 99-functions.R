@@ -8,8 +8,15 @@ expand_number_len <- function(dat_lf, dat_rho, length_bin) {
            starts_with("lf")) %>%
     reshape2::melt(measure.vars = lf_cols) %>%
     mutate(
-      value.expand = ifelse(number > 0, number/nmeasured * value, 0),
-      len = strsplit(as.character(.data$variable), "lf") %>% sapply(getElement, 2) %>% as.numeric() %>% round()
+      value.int = ifelse(number == ceiling(number), ceiling(value), value)
+    ) %>%
+    mutate(
+      nmeasured = sum(value.int), .by = c(year, trip, set),
+    ) %>%
+    mutate(
+      value.expand = ifelse(number > 0, number/nmeasured * value.int, 0),
+      len = strsplit(as.character(.data$variable), "lf") %>% sapply(getElement, 2) %>%
+        as.numeric() %>% round()
     )
 
   if (missing(dat_rho)) {
@@ -32,11 +39,12 @@ expand_number_len <- function(dat_lf, dat_rho, length_bin) {
   }
 
   dout <- d %>%
-    summarise(number.size = sum(value.expand),
+    summarise(number.int = sum(value.int),
+              number.expand = sum(value.expand),
               number.calibrate = sum(value.calibrate),
               .by = c(year, vessel, trip, set, NAFOdiv, strat, strat.area, long.start, lat.start,
                       set.depth.mean, data.series, dist.towed, number, nmeasured, bin)) %>%
-    mutate(rho.eff = ifelse(number.size > 0, number.calibrate/number.size, NA))
+    mutate(rho.eff = ifelse(number.int > 0, number.calibrate/number.expand, NA))
 
   if (missing(length_bin)) {
     dout$length <- dout$bin
@@ -150,7 +158,9 @@ make_design_index <- function(dat, simsurvey = FALSE) {
 }
 
 fit_sdmTMB <- function(dat, formula = number ~ poly(log_depth, 2, raw = TRUE) + data.series,
-                       offset = log(dat$swept.area), ...) {
+                       offset = log(dat$swept.area), family = nbinom2(),
+                       spatiotemporal = "rw", 
+                       ...) {
 
   require(sdmTMB)
 
@@ -170,10 +180,9 @@ fit_sdmTMB <- function(dat, formula = number ~ poly(log_depth, 2, raw = TRUE) + 
     data = dat,
     mesh = mesh,
     time = "year",
-    family = nbinom2(),
+    family = family,
     extra_time = extra_time,
-    spatial = "on",
-    spatiotemporal = "rw",
+    spatiotemporal = spatiotemporal,
     offset = offset,
     anisotropy = TRUE,
     ...
@@ -183,7 +192,7 @@ fit_sdmTMB <- function(dat, formula = number ~ poly(log_depth, 2, raw = TRUE) + 
 }
 
 
-do_retrospective <- function(yret, dat, sp, cpus = length(yret)) {
+do_retrospective <- function(yret, dat, sp, cpus = length(yret), ...) {
 
   require(snowfall)
 
@@ -191,46 +200,48 @@ do_retrospective <- function(yret, dat, sp, cpus = length(yret)) {
   sfExport(list = "fit_sdmTMB")
   on.exit(snowfall::sfStop())
 
-  fit_list <- sfLapply(yret, function(y, dat) {
+  fit_list <- sfLapply(yret, function(y, dat, ...) {
     dat_fit <- dplyr::filter(dat, year <= y)
-    fit <- fit_sdmTMB(dat_fit)
+    fit <- fit_sdmTMB(dat_fit, ...)
     saveRDS(fit, file = paste0("validation/models/", sp, "_ret_fit_", y, ".rds"))
     return(fit)
-  }, dat = dat)
+  }, dat = dat, ...)
 
   return(fit_list)
 }
 
-do_null_test <- function(ydummy, dat, sp, cpus = length(ydummy)) {
+do_null_test <- function(ydummy, dat, sp, cpus = length(ydummy), ...) {
   require(snowfall)
 
   snowfall::sfInit(TRUE, cpus = cpus)
   sfExport(list = "fit_sdmTMB")
   on.exit(snowfall::sfStop())
 
-  fit_list <- sfLapply(ydummy, function(y, dat) {
+  fit_list <- sfLapply(ydummy, function(y, dat, ...) {
 
     if (!is.na(y)) {
       dat_fit <- dplyr::mutate(dat, dummy = year >= y)
       fit <- fit_sdmTMB(
         dat_fit,
-        number ~ poly(log_depth, 2, raw = TRUE) + dummy
+        number ~ poly(log_depth, 2, raw = TRUE) + dummy,
+        ...
       )
     } else {
       dat_fit <- dat
       fit <- fit_sdmTMB(
         dat_fit,
-        number ~ poly(log_depth, 2, raw = TRUE)
+        number ~ poly(log_depth, 2, raw = TRUE),
+        ...
       )
     }
     saveRDS(fit, file = paste0("validation/models/", sp, "_null_fit_", y, ".rds"))
     return(fit)
-  }, dat = dat)
+  }, dat = dat, ...)
 
   return(fit_list)
 }
 
-do_retrospective_gap <- function(gap = 0, yret = max(dat$year), dat, sp, year_new_vessel = 1995, cpus = length(gap)) {
+do_retrospective_gap <- function(gap = 0, yret = max(dat$year), dat, sp, year_new_vessel = 1995, cpus = length(gap), ...) {
 
   require(snowfall)
 
@@ -240,16 +251,16 @@ do_retrospective_gap <- function(gap = 0, yret = max(dat$year), dat, sp, year_ne
 
   fit_list <- sfLapply(gap, function(ygap, dat, year_new_vessel) {
     dat_fit <- dplyr::filter(dat, .data$year < year_new_vessel | .data$year >= year_new_vessel + ygap)
-    fit <- fit_sdmTMB(dat_fit)
+    fit <- fit_sdmTMB(dat_fit, ...)
     saveRDS(fit, file = paste0("validation/models/", sp, "_gap_fit_", ygap, ".rds"))
     return(fit)
-  }, dat = dat, year_new_vessel = year_new_vessel)
+  }, dat = dat, year_new_vessel = year_new_vessel, ...)
 
   return(fit_list)
 }
 
 
-make_index <- function(fit, grid, year_new_vessel = 1995) {
+make_index <- function(fit, grid, year_new_vessel = 1995, pred_only = FALSE) {
 
   require(dplyr)
 
@@ -259,6 +270,7 @@ make_index <- function(fit, grid, year_new_vessel = 1995) {
   newdata <- sdmTMB::replicate_df(grid, time_name = "year", time_values = y)
 
   p <- predict(fit, newdata = newdata, return_tmb_object = TRUE)
+  if (pred_only) return(p)
   index <- sdmTMB::get_index(p, bias_correct = TRUE, area = newdata$area_km2)
   index$year_ret <- max(index$year)
 
@@ -328,4 +340,49 @@ plot_rho_size <- function(m, bin = seq(1, 200, 1)) {
     geom_line(aes(y = log_rho - 1.96 * se), linetype = 2) +
     labs(x = "Length", y = expression(log(rho)))
   g
+}
+
+do_fit_size <- function(dat, formula = number.int ~ poly(log_depth, 2, raw = TRUE),
+                        length_bin = unique(dat$length), sp, cpus = length(length_bin),
+                        type = c("est", "calibrated", "ret", "gap"), ...) {
+
+  type <- match.arg(type)
+
+  require(snowfall)
+
+  snowfall::sfInit(TRUE, cpus = cpus)
+  sfExport(list = "fit_sdmTMB")
+  on.exit(snowfall::sfStop())
+
+  fit_list <- sfLapply(length_bin, function(i, dat, sp, formula, type, ...) {
+    dat_fit <- dplyr::filter(dat, .data$length == i)
+
+    fit <- fit_sdmTMB(
+      dat_fit,
+      formula = formula,
+      offset = log(dat_fit$offset),
+      family = nbinom2(),
+      #spatiotemporal = "rw",
+      ...
+    )
+    saveRDS(fit, paste0("validation_size/models/", sp, "_fit_", type, "_", i, ".rds"))
+    return(fit)
+  }, dat = dat, sp = sp, formula = formula, type = type, ...)
+
+  return(fit_list)
+}
+
+make_index_size <- function(fit_list, length_bin, grid, cpus = length(length_bin)) {
+
+  require(snowfall)
+
+  snowfall::sfInit(TRUE, cpus = cpus)
+  on.exit(snowfall::sfStop())
+
+  index_list <- sfLapply(fit_list, make_index, grid = grid)
+
+  Map(function(x, y) dplyr::mutate(x, length = y), x = index_list, y = length_bin) %>%
+    dplyr::bind_rows()
+
+  return(fit_list)
 }
