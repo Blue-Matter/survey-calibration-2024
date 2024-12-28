@@ -287,6 +287,40 @@ g <- ggplot(set_len, aes(bin, value, colour = gear)) +
   labs(x = "Length", y = "Frequency", colour = "Gear")
 ggsave("validation_size/figures/cod_CF_lengthcomp.png", g, width = 6, height = 3.5)
 
+
+# cumulative length distribution combined from all data
+set_cumulative <- set_len %>%
+  summarise(value = sum(value), .by = bin) %>%
+  arrange(bin) %>%
+  mutate(
+    Rel = value/sum(value),
+    Cumulative = cumsum(value)/sum(value)
+  ) %>%
+  select(!value)
+
+set_cumulative %>%
+  summarise(l33 = approx(Cumulative, bin, xout = 1/3)$y,
+            l50 = approx(Cumulative, bin, xout = 0.5)$y,
+            l66 = approx(Cumulative, bin, xout = 2/3)$y)
+
+g <- set_cumulative %>%
+  reshape2::melt(id.vars = c("bin")) %>%
+  #filter(variable == "Rel") %>%
+  mutate(variable = ifelse(variable == "Rel", "Proportion", "Cumulative frequency")) %>%
+  ggplot(aes(bin, value)) +
+  geom_line() +
+  facet_grid(vars(variable), scales = "free_y", switch = "both") +
+  coord_cartesian(xlim = c(0, 100)) +
+  labs(x = "Length", y = NULL, colour = "Gear") +
+  guides(linetype = "none") +
+  theme(
+    panel.spacing = unit(0, "in"),
+    strip.background = element_rect(fill = NA, colour = NA),
+    strip.placement = "outside"
+  ) +
+  geom_vline(xintercept = 42, linetype = 2)
+
+# cumulative length distribution by gear
 set_cumulative <- set_len %>%
   arrange(bin) %>%
   mutate(
@@ -311,6 +345,7 @@ g <- set_cumulative %>%
     strip.placement = "outside"
   )
 ggsave("validation_size/figures/cod_CF_cumlengthcomp.png", g, width = 5.5, height = 5)
+
 
 
 set_pair_fn <- function(i) {

@@ -7,28 +7,30 @@ expand_number_len <- function(dat_lf, dat_rho, length_bin) {
     select(year, vessel, trip, set, NAFOdiv, strat, strat.area, long.start, lat.start, set.depth.mean, data.series, dist.towed, number, nmeasured,
            starts_with("lf")) %>%
     reshape2::melt(measure.vars = lf_cols) %>%
+    #mutate(
+    #  value.int = ifelse(number == ceiling(number), ceiling(value), value)
+    #) %>%
+    #mutate(
+    #  nmeasured = sum(value.int), .by = c(year, trip, set),
+    #) %>%
     mutate(
-      value.int = ifelse(number == ceiling(number), ceiling(value), value)
-    ) %>%
-    mutate(
-      nmeasured = sum(value.int), .by = c(year, trip, set),
-    ) %>%
-    mutate(
-      value.expand = ifelse(number > 0, number/nmeasured * value.int, 0),
+    #  value.expand = ifelse(number > 0, number/nmeasured * value.int, 0),
       len = strsplit(as.character(.data$variable), "lf") %>% sapply(getElement, 2) %>%
         as.numeric() %>% round()
     )
 
   if (missing(dat_rho)) {
     d$rho <- 1
-    d$value.calibrate <- d$value.expand * d$rho
+    d$value.calibrate <- d$value * d$rho
+    #d$value.calibrate <- d$value.expand * d$rho
   } else {
     d <- left_join(
       d,
       select(dat_rho, bin, rho),
       by = c("len" = "bin")
     ) %>%
-      mutate(value.calibrate = value.expand * rho)
+      mutate(value.calibrate = value * rho)
+      #mutate(value.calibrate = value.expand * rho)
   }
 
   if (missing(length_bin)) {
@@ -38,13 +40,21 @@ expand_number_len <- function(dat_lf, dat_rho, length_bin) {
       mutate(bin = findInterval(len, length_bin))
   }
 
+  #dout <- d %>%
+  #  summarise(number.int = sum(value.int),
+  #            number.expand = sum(value.expand),
+  #            number.calibrate = sum(value.calibrate),
+  #            .by = c(year, vessel, trip, set, NAFOdiv, strat, strat.area, long.start, lat.start,
+  #                    set.depth.mean, data.series, dist.towed, number, nmeasured, bin)) %>%
+  #  mutate(rho.eff = ifelse(number.int > 0, number.calibrate/number.expand, NA))
+
   dout <- d %>%
-    summarise(number.int = sum(value.int),
-              number.expand = sum(value.expand),
-              number.calibrate = sum(value.calibrate),
+    summarise(value.calibrate = sum(value.calibrate),
+              value = sum(value),
               .by = c(year, vessel, trip, set, NAFOdiv, strat, strat.area, long.start, lat.start,
                       set.depth.mean, data.series, dist.towed, number, nmeasured, bin)) %>%
-    mutate(rho.eff = ifelse(number.int > 0, number.calibrate/number.expand, NA))
+    mutate(rho.eff = ifelse(value.calibrate > 0, value.calibrate/value, NA))
+
 
   if (missing(length_bin)) {
     dout$length <- dout$bin
@@ -159,7 +169,7 @@ make_design_index <- function(dat, simsurvey = FALSE) {
 
 fit_sdmTMB <- function(dat, formula = number ~ poly(log_depth, 2, raw = TRUE) + data.series,
                        offset = log(dat$swept.area), family = nbinom2(),
-                       spatiotemporal = "rw", 
+                       spatiotemporal = "rw",
                        ...) {
 
   require(sdmTMB)
@@ -344,30 +354,32 @@ plot_rho_size <- function(m, bin = seq(1, 200, 1)) {
 
 do_fit_size <- function(dat, formula = number.int ~ poly(log_depth, 2, raw = TRUE),
                         length_bin = unique(dat$length), sp, cpus = length(length_bin),
-                        type = c("est", "calibrated", "ret", "gap"), ...) {
+                        type = c("est", "calibrated", "ret", "gap"), family = delta_lognormal(),
+                        offset = NULL, ...) {
 
   type <- match.arg(type)
 
   require(snowfall)
 
   snowfall::sfInit(TRUE, cpus = cpus)
+  sfLibrary(sdmTMB)
   sfExport(list = "fit_sdmTMB")
   on.exit(snowfall::sfStop())
 
-  fit_list <- sfLapply(length_bin, function(i, dat, sp, formula, type, ...) {
+  fit_list <- sfLapply(length_bin, function(i, dat, sp, formula, type, family, offset, ...) {
     dat_fit <- dplyr::filter(dat, .data$length == i)
 
     fit <- fit_sdmTMB(
       dat_fit,
       formula = formula,
-      offset = log(dat_fit$offset),
-      family = nbinom2(),
+      offset = offset,
+      family = family,
       #spatiotemporal = "rw",
       ...
     )
     saveRDS(fit, paste0("validation_size/models/", sp, "_fit_", type, "_", i, ".rds"))
     return(fit)
-  }, dat = dat, sp = sp, formula = formula, type = type, ...)
+  }, dat = dat, sp = sp, formula = formula, type = type, family = family, offset = offset, ...)
 
   return(fit_list)
 }
