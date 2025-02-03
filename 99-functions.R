@@ -294,7 +294,6 @@ make_index <- function(fit, grid, year_new_vessel = 1995, pred_only = FALSE) {
   return(index)
 }
 
-
 make_index_ret <- function(fit_ret, grid, cpus = length(fit_ret)) {
 
   require(snowfall)
@@ -393,8 +392,8 @@ make_index_size <- function(fit_list, length_bin, grid, cpus = length(length_bin
 
   index_list <- sfLapply(fit_list, make_index, grid = grid)
 
-  Map(function(x, y) dplyr::mutate(x, length = y), x = index_list, y = length_bin) %>%
+  ind <- Map(function(x, y) dplyr::mutate(x, length = y), x = index_list, y = length_bin) %>%
     dplyr::bind_rows()
 
-  return(fit_list)
+  return(ind)
 }
