@@ -3,34 +3,32 @@
 expand_number_len <- function(dat_lf, dat_rho, length_bin) {
   lf_cols <- names(dat_lf)[grep("lf", names(dat_lf))]
 
+  # Numbers at length are not integers because they were standardized to 15 minute tows
+  # Simply round to nearest whole number
   d <- dat_lf %>%
     select(year, vessel, trip, set, NAFOdiv, strat, strat.area, long.start, lat.start, set.depth.mean, data.series, dist.towed, number, nmeasured,
            starts_with("lf")) %>%
     reshape2::melt(measure.vars = lf_cols) %>%
-    #mutate(
-    #  value.int = ifelse(number == ceiling(number), ceiling(value), value)
-    #) %>%
-    #mutate(
-    #  nmeasured = sum(value.int), .by = c(year, trip, set),
-    #) %>%
     mutate(
-    #  value.expand = ifelse(number > 0, number/nmeasured * value.int, 0),
+      nmeasured = sum(value), .by = c(year, trip, set),
+    ) %>%
+    mutate(
+      value.expand = ifelse(number > 0, number/nmeasured * value, 0),
       len = strsplit(as.character(.data$variable), "lf") %>% sapply(getElement, 2) %>%
-        as.numeric() %>% round()
-    )
+        as.numeric() %>% round(),
+    ) %>%
+    mutate(nmeasured.expand = sum(value.expand), .by = c(year, trip, set))
 
   if (missing(dat_rho)) {
     d$rho <- 1
-    d$value.calibrate <- d$value * d$rho
-    #d$value.calibrate <- d$value.expand * d$rho
+    d$value.expand.rho <- d$rho * d$value.expand
   } else {
     d <- left_join(
       d,
       select(dat_rho, bin, rho),
       by = c("len" = "bin")
     ) %>%
-      mutate(value.calibrate = value * rho)
-      #mutate(value.calibrate = value.expand * rho)
+      mutate(value.expand.rho = rho * value.expand)
   }
 
   if (missing(length_bin)) {
@@ -39,21 +37,13 @@ expand_number_len <- function(dat_lf, dat_rho, length_bin) {
     d <- d %>%
       mutate(bin = findInterval(len, length_bin))
   }
-
-  #dout <- d %>%
-  #  summarise(number.int = sum(value.int),
-  #            number.expand = sum(value.expand),
-  #            number.calibrate = sum(value.calibrate),
-  #            .by = c(year, vessel, trip, set, NAFOdiv, strat, strat.area, long.start, lat.start,
-  #                    set.depth.mean, data.series, dist.towed, number, nmeasured, bin)) %>%
-  #  mutate(rho.eff = ifelse(number.int > 0, number.calibrate/number.expand, NA))
-
   dout <- d %>%
-    summarise(value.calibrate = sum(value.calibrate),
+    summarise(value.expand = sum(value.expand),
+              value.expand.rho = sum(value.expand.rho),
               value = sum(value),
               .by = c(year, vessel, trip, set, NAFOdiv, strat, strat.area, long.start, lat.start,
-                      set.depth.mean, data.series, dist.towed, number, nmeasured, bin)) %>%
-    mutate(rho.eff = ifelse(value.calibrate > 0, value.calibrate/value, NA))
+                      set.depth.mean, data.series, dist.towed, number, nmeasured, nmeasured.expand, bin)) %>%
+    mutate(rho.eff = ifelse(value.expand > 0, value.expand.rho/value.expand, 1))
 
 
   if (missing(length_bin)) {
@@ -353,8 +343,7 @@ plot_rho_size <- function(m, bin = seq(1, 200, 1)) {
 
 do_fit_size <- function(dat, formula = number.int ~ poly(log_depth, 2, raw = TRUE),
                         length_bin = unique(dat$length), sp, cpus = length(length_bin),
-                        type = c("est", "calibrated", "ret", "gap"), family = delta_lognormal(),
-                        offset = NULL, ...) {
+                        type = c("est", "calibrated", "ret", "gap"), family = nbinom2(), ...) {
 
   type <- match.arg(type)
 
@@ -365,20 +354,19 @@ do_fit_size <- function(dat, formula = number.int ~ poly(log_depth, 2, raw = TRU
   sfExport(list = "fit_sdmTMB")
   on.exit(snowfall::sfStop())
 
-  fit_list <- sfLapply(length_bin, function(i, dat, sp, formula, type, family, offset, ...) {
+  fit_list <- sfLapply(length_bin, function(i, dat, sp, formula, type, family, ...) {
     dat_fit <- dplyr::filter(dat, .data$length == i)
 
     fit <- fit_sdmTMB(
       dat_fit,
       formula = formula,
-      offset = offset,
+      offset = dat_fit$offset,
       family = family,
-      #spatiotemporal = "rw",
       ...
     )
     saveRDS(fit, paste0("validation_size/models/", sp, "_fit_", type, "_", i, ".rds"))
     return(fit)
-  }, dat = dat, sp = sp, formula = formula, type = type, family = family, offset = offset, ...)
+  }, dat = dat, sp = sp, formula = formula, type = type, family = family, ...)
 
   return(fit_list)
 }

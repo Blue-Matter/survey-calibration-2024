@@ -12,15 +12,15 @@ source("99-functions.R")
   ggplot2::ggsave(filename, ...)
 }
 
-#sp <- c("cod", "ghl")
-sp <- "cod"
+sp <- c("cod", "ghl")
+#sp <- "cod"
 
 # "est" = use estimated calibration factors from comparative fishing
 # "calibrated" = estimate calibration factor in spatiotemporal model
 # "norho" = no calibration factor in spatiotemporal model
 type <- c("est", "calibrated", "norho")
 
-fit <- FALSE
+fit <- TRUE
 
 # Fit models
 for (s in sp) {
@@ -91,7 +91,7 @@ for (s in sp) {
       ) %>%
       sdmTMB::add_utm_columns(ll_names = c("long.start", "lat.start")) %>%
       mutate(data.series = factor(data.series, levels = c("Engel", "Campelen"))) %>%
-      mutate(npue = value.calibrate/swept.area)
+      mutate(number.int = round(value.expand), offset = log(swept.area/rho.eff))
 
     #g <- ggplot(dat_lf, aes(year, npue, colour = data.series)) +
     #  facet_wrap(vars(length)) +
@@ -122,24 +122,28 @@ for (s in sp) {
     #dat_lf %>%
     #  summarise(p = mean(npue == 0), .by = c(year, length))
 
-    # Delta lognormal model
+    # Fit model
     if (fit) {
       formula_pos <- switch(
         i,
-        "calibrated" = npue ~ 1 + poly(log_depth, 2, raw = TRUE) + data.series,
-        npue ~ 1 + poly(log_depth, 2, raw = TRUE)
+        "calibrated" = number.int ~ 1 + poly(log_depth, 2, raw = TRUE) + data.series,
+        number.int ~ 1 + poly(log_depth, 2, raw = TRUE)
       )
 
-      formula_zero <- npue ~ 1 + poly(log_depth, 2, raw = TRUE)
+      formula_zero <- number.int ~ 1 + poly(log_depth, 2, raw = TRUE)
 
       tictoc::tic()
       fit_list <- do_fit_size(
         dat_lf,
-        formula = list(formula_zero, formula_pos),
-        length_bin = length_bin, sp = s,
+        formula = formula_pos,
+        #formula = list(formula_zero, formula_pos),
+        length_bin = length_bin,
+        sp = s,
         type = i,
-        spatiotemporal = list("off", "rw"),
+        #spatiotemporal = list("off", "rw"),
+        spatiotemporal = "rw",
         spatial = "on",
+        family = nbinom2(),
         do_fit = TRUE
       )
       tictoc::toc()
@@ -162,13 +166,15 @@ for (s in sp) {
   # Plot calibration factors
   # Currently there is an issue, need to properly use offset in the sdm model
   rho <- readr::read_csv(file.path("validation_size", paste0(s, "_rho_comparative.csv"))) %>%
-    filter(Model != "GAM")
+    #filter(Model != "GAM") %>%
+    filter(Model == "RW") %>%
+    mutate(Model = paste("CF -", Model))
 
   fit_list <- lapply(length_bin, function(ell) {
     readRDS(file.path("validation_size", "models", paste0(s, "_fit_calibrated_", ell, ".rds")))
   })
-  log_rho <- sapply(fit_list, function(i) coef(i)["(Intercept)"])
-  se <- sapply(fit_list, function(i) as.numeric(tidy(i)[1, "std.error"]))
+  log_rho <- sapply(fit_list, function(i) coef(i)["data.seriesCampelen"])
+  se <- sapply(fit_list, function(i) as.numeric(sdmTMB::tidy(i)[4, "std.error"]))
 
   rho_sdm <- data.frame(
     bin = unique(rho$bin),
@@ -183,13 +189,13 @@ for (s in sp) {
 
   g <- rbind(rho, rho_sdm) %>%
     ggplot(aes(bin, colour = Model)) +
-    facet_wrap(vars(Model)) +
     geom_line(aes(y = log_rho)) +
     geom_line(aes(y = log_rho + 1.96 * se), linetype = 2) +
     geom_line(aes(y = log_rho - 1.96 * se), linetype = 2) +
     labs(x = "Length", y = expression(log(rho))) +
     coord_cartesian(xlim = if (s == "cod") c(0, 100) else c(0, 75),
                     ylim = if (s == "cod") c(-5, 7) else c(-4, 6))
+  .ggsave("rho_sdm.png", sp = s, g, width = 6, height = 3.5)
 
 
 }
