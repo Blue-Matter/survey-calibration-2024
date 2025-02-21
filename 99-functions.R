@@ -343,7 +343,7 @@ plot_rho_size <- function(m, bin = seq(1, 200, 1)) {
 
 do_fit_size <- function(dat, formula = number.int ~ poly(log_depth, 2, raw = TRUE),
                         length_bin = unique(dat$length), sp, cpus = length(length_bin),
-                        type = c("est", "calibrated", "ret", "gap"), family = nbinom2(), ...) {
+                        type = c("est", "calibrated", "ret", "gap", "norho"), family = nbinom2(), ...) {
 
   type <- match.arg(type)
 
