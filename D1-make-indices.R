@@ -137,59 +137,59 @@ for (s in sp) {
   #mesh <- make_mesh(dat_utm, c("X", "Y"), type = "cutoff", cutoff = 20)
 
   ### Estimate calibration factor
-#  fit <- fit_sdmTMB(
-#    dat_utm,
-#    formula = CATCH ~ 1 + SV_VESSEL,
-#    offset = log(dat_utm$EFFORT)
-#  )
-#  saveRDS(fit, paste0("validation_nefsc/models/", s, "_fit_full.rds"))
-#  #fit <- readRDS(paste0("validation_nefsc/models/", s, "_fit_full.rds"))
-#
-#  index <- make_index(fit, grid2)
-#  readr::write_csv(index, paste0("validation_nefsc/index/", s, "_index.csv"))
-#  #index <- readr::read_csv(paste0("validation_nefsc/index/", s, "_index.csv"))
-#
-#  ### Provide calibration factor from CF
-#  fit_rho <- fit_sdmTMB(
-#    dat_utm,
-#    formula = CATCH ~ 1,
-#    offset = log(dat_utm$EFFORT/dat_utm$calibration)
-#  )
-#  saveRDS(fit_rho, paste0("validation_nefsc/models/", s, "_fit_calibration.rds"))
-#  #fit_rho <- readRDS(paste0("validation_nefsc/models/", s, "_fit_calibration.rds"))
-#
-#  index_rho <- make_index(fit_rho, grid2)
-#  readr::write_csv(index_rho, paste0("validation_nefsc/index/", s, "_index_calibration.csv"))
-#  #index_rho <- readr::read_csv(paste0("validation_nefsc/index/", s, "_index_calibration.csv"))
-#
-#  ### No calibration factor
-#  fit_norho <- fit_sdmTMB(
-#    dat_utm,
-#    formula = CATCH ~ 1,
-#    offset = log(dat_utm$EFFORT)
-#  )
-#  saveRDS(fit_norho, paste0("validation_nefsc/models/", s, "_fit_norho.rds"))
-#  #fit_norho <- readRDS(paste0("validation_nefsc/models/", s, "_fit_norho.rds"))
-#
-#  index_norho <- make_index(fit_norho, grid2)
-#  readr::write_csv(index_norho, paste0("validation_nefsc/index/", s, "_index_norho.csv"))
-#  #index_norho <- readr::read_csv(paste0("validation_nefsc/index/", s, "_index_norho.csv"))
-#
-#  ### Plot and compare indices ----
-#  index_compare <- rbind(
-#    index_rho %>% mutate(Model = "Comparative rho"),
-#    index %>% mutate(Model = "Estimate rho"),
-#    index_norho %>% mutate(Model = "No rho")
-#  )
-#  g <- ggplot(index_compare, aes(year, est, linetype = Model, shape = Model)) +
-#    geom_point() +
-#    geom_line() +
-#    geom_vline(xintercept = 2008.5, linetype = 2) +
-#    labs(x = "Year", y = "Harry Bigelow Index") +
-#    scale_shape_manual(values = c(16, 1, 4)) +
-#    scale_linetype_manual(values = c(1, 2, 3)) +
-#    theme(legend.position = "bottom")
-#  .ggsave("index_no_comparative.png", g, height = 4, width = 6)
+  fit <- fit_sdmTMB(
+    dat_utm,
+    formula = CATCH ~ 1 + SV_VESSEL,
+    offset = log(dat_utm$EFFORT)
+  )
+  saveRDS(fit, paste0("validation_nefsc/models/", s, "_fit_full.rds"))
+  #fit <- readRDS(paste0("validation_nefsc/models/", s, "_fit_full.rds"))
+
+  index <- make_index(fit, grid2)
+  readr::write_csv(index, paste0("validation_nefsc/index/", s, "_index.csv"))
+  #index <- readr::read_csv(paste0("validation_nefsc/index/", s, "_index.csv"))
+
+  ### Provide calibration factor from CF
+  fit_rho <- fit_sdmTMB(
+    dat_utm,
+    formula = CATCH ~ 1,
+    offset = log(dat_utm$EFFORT/dat_utm$calibration)
+  )
+  saveRDS(fit_rho, paste0("validation_nefsc/models/", s, "_fit_calibration.rds"))
+  #fit_rho <- readRDS(paste0("validation_nefsc/models/", s, "_fit_calibration.rds"))
+
+  index_rho <- make_index(fit_rho, grid2)
+  readr::write_csv(index_rho, paste0("validation_nefsc/index/", s, "_index_calibration.csv"))
+  #index_rho <- readr::read_csv(paste0("validation_nefsc/index/", s, "_index_calibration.csv"))
+
+  ### No calibration factor
+  fit_norho <- fit_sdmTMB(
+    dat_utm,
+    formula = CATCH ~ 1,
+    offset = log(dat_utm$EFFORT)
+  )
+  saveRDS(fit_norho, paste0("validation_nefsc/models/", s, "_fit_norho.rds"))
+  #fit_norho <- readRDS(paste0("validation_nefsc/models/", s, "_fit_norho.rds"))
+
+  index_norho <- make_index(fit_norho, grid2)
+  readr::write_csv(index_norho, paste0("validation_nefsc/index/", s, "_index_norho.csv"))
+  #index_norho <- readr::read_csv(paste0("validation_nefsc/index/", s, "_index_norho.csv"))
+
+  ### Plot and compare indices ----
+  index_compare <- rbind(
+    index_rho %>% mutate(Model = "Comparative rho"),
+    index %>% mutate(Model = "Estimate rho"),
+    index_norho %>% mutate(Model = "No rho")
+  )
+  g <- ggplot(index_compare, aes(year, est, linetype = Model, shape = Model)) +
+    geom_point() +
+    geom_line() +
+    geom_vline(xintercept = 2008.5, linetype = 2) +
+    labs(x = "Year", y = "Harry Bigelow Index") +
+    scale_shape_manual(values = c(16, 1, 4)) +
+    scale_linetype_manual(values = c(1, 2, 3)) +
+    theme(legend.position = "bottom")
+  .ggsave("index_no_comparative.png", g, height = 4, width = 6)
 
   dat_utm <- dat_utm %>% rename(swept.area = EFFORT)
 
@@ -260,8 +260,8 @@ for (s in sp) {
   index_gap <- make_index_ret(fit_gap, grid2) %>%
     mutate(gap = gap - min(gap) + 1) %>%
     mutate(impute = year >= year_new_vessel & year < year_new_vessel + gap)
-  readr::write_csv(index_gap, paste0("validation/index/", s, "_index_gap.csv"))
-  #index_gap <- readr::read_csv(paste0("validation/index/", s, "_index_gap.csv"))
+  readr::write_csv(index_gap, paste0("validation_nefsc/index/", s, "_index_gap.csv"))
+  #index_gap <- readr::read_csv(paste0("validation_nefsc/index/", s, "_index_gap.csv"))
 
   g <- ggplot(index_gap, aes(year, est)) +
     geom_point(aes(shape = impute, colour = factor(gap))) +
