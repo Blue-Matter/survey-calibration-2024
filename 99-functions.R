@@ -192,7 +192,7 @@ fit_sdmTMB <- function(dat, formula = number ~ poly(log_depth, 2, raw = TRUE) + 
 }
 
 
-do_retrospective <- function(yret, dat, sp, cpus = length(yret), ...) {
+do_retrospective <- function(yret, dat, sp, cpus = length(yret), dir_name = "validation", ...) {
 
   require(snowfall)
 
@@ -200,48 +200,58 @@ do_retrospective <- function(yret, dat, sp, cpus = length(yret), ...) {
   sfExport(list = "fit_sdmTMB")
   on.exit(snowfall::sfStop())
 
-  fit_list <- sfLapply(yret, function(y, dat, ...) {
+  fit_list <- sfLapply(yret, function(y, dat, sp, dir_name, ...) {
     dat_fit <- dplyr::filter(dat, year <= y)
     fit <- fit_sdmTMB(dat_fit, ...)
-    saveRDS(fit, file = paste0("validation/models/", sp, "_ret_fit_", y, ".rds"))
+    saveRDS(fit, file = file.path(dir_name, "models", paste0(sp, "_ret_fit_", y, ".rds")))
     return(fit)
-  }, dat = dat, ...)
+  }, dat = dat, sp = sp, dir_name = dir_name, ...)
 
   return(fit_list)
 }
 
-do_null_test <- function(ydummy, dat, sp, cpus = length(ydummy), ...) {
+do_null_test <- function(ydummy, dat, sp, cpus = length(ydummy),
+                         formula = number ~ poly(log_depth, 2, raw = TRUE),
+                         formula_null = number ~ poly(log_depth, 2, raw = TRUE) + dummy,
+                         dir_name = "validation", ...) {
   require(snowfall)
 
   snowfall::sfInit(TRUE, cpus = cpus)
   sfExport(list = "fit_sdmTMB")
   on.exit(snowfall::sfStop())
 
-  fit_list <- sfLapply(ydummy, function(y, dat, ...) {
+  fit_list <- sfLapply(ydummy, function(y, dat, formula, formula_null, sp, dir_name, ...) {
 
     if (!is.na(y)) {
       dat_fit <- dplyr::mutate(dat, dummy = year >= y)
       fit <- fit_sdmTMB(
         dat_fit,
-        number ~ poly(log_depth, 2, raw = TRUE) + dummy,
+        formula = formula_null,
         ...
       )
     } else {
       dat_fit <- dat
       fit <- fit_sdmTMB(
         dat_fit,
-        number ~ poly(log_depth, 2, raw = TRUE),
+        formula = formula,
         ...
       )
     }
-    saveRDS(fit, file = paste0("validation/models/", sp, "_null_fit_", y, ".rds"))
+    saveRDS(fit, file = file.path(dir_name, "models", paste0(sp, "_null_fit_", y, ".rds")))
     return(fit)
-  }, dat = dat, ...)
+  },
+  dat = dat,
+  formula = formula,
+  formula_null = formula_null,
+  sp = sp,
+  dir_name = dir_name,
+  ...)
 
   return(fit_list)
 }
 
-do_retrospective_gap <- function(gap = 0, yret = max(dat$year), dat, sp, year_new_vessel = 1995, cpus = length(gap), ...) {
+do_retrospective_gap <- function(gap = 0, dat, sp, year_new_vessel = 1995, cpus = length(gap),
+                                 dir_name = "validation", ...) {
 
   require(snowfall)
 
@@ -249,18 +259,18 @@ do_retrospective_gap <- function(gap = 0, yret = max(dat$year), dat, sp, year_ne
   sfExport(list = "fit_sdmTMB")
   on.exit(snowfall::sfStop())
 
-  fit_list <- sfLapply(gap, function(ygap, dat, year_new_vessel) {
+  fit_list <- sfLapply(gap, function(ygap, dat, year_new_vessel, sp, dir_name, ...) {
     dat_fit <- dplyr::filter(dat, .data$year < year_new_vessel | .data$year >= year_new_vessel + ygap)
     fit <- fit_sdmTMB(dat_fit, ...)
-    saveRDS(fit, file = paste0("validation/models/", sp, "_gap_fit_", ygap, ".rds"))
+    saveRDS(fit, file = file.path(dir_name, "models", paste0(sp, "_gap_fit_", ygap, ".rds")))
     return(fit)
-  }, dat = dat, year_new_vessel = year_new_vessel, ...)
+  }, dat = dat, year_new_vessel = year_new_vessel, sp = sp, dir_name = dir_name, ...)
 
   return(fit_list)
 }
 
 
-make_index <- function(fit, grid, year_new_vessel = 1995, pred_only = FALSE) {
+make_index <- function(fit, grid, pred_only = FALSE) {
 
   require(dplyr)
 
@@ -296,7 +306,7 @@ make_index_ret <- function(fit_ret, grid, cpus = length(fit_ret)) {
   do.call(rbind, index_list)
 }
 
-get_vessel_effect <- function(fit_list) {
+get_vessel_effect <- function(fit_list, par_no = 3) {
 
   vessel_effect <- lapply(1:length(fit_list), function(i) {
     summary(fit_list[[i]]$sd_report, select = "fixed") %>%
@@ -305,7 +315,7 @@ get_vessel_effect <- function(fit_list) {
       mutate(sequence = i)
   }) %>%
     bind_rows() %>%
-    filter(var == "b_j.3") %>%
+    filter(var == paste0("b_j.", par_no)) %>%
     mutate(lwr = Estimate - 1.96 * `Std. Error`, upr = Estimate + 1.96 * `Std. Error`)
 
   return(vessel_effect)
