@@ -285,7 +285,7 @@ for (s in sp) {
     geom_ribbon(data = log_rho_comparative, fill = "grey80", aes(x, ymin = y2, ymax = y1), inherit.aes = FALSE) +
     geom_hline(yintercept = log_rho_comparative$y1[1], linetype = 3) +
     geom_hline(yintercept = log_rho_comparative$y2[1], linetype = 3) +
-    geom_hline(yintercept = 2.072, linetype = 2) +
+    geom_hline(yintercept = ifelse(s == "cod", 2.072, 0.8913), linetype = 2) +
     geom_point() +
     geom_linerange(aes(ymin = lwr, max = upr)) +
     labs(x = "Survey gap", y = "Campelen gear effect")
@@ -336,7 +336,7 @@ for (s in sp) {
   #  readRDS(paste0("validation/models/", s, "_null_fit_", y, ".rds"))
   #})
 
-  index_null <- make_index_ret(fit_null, grid)
+  index_null <- make_index_ret(fit_null, grid_null)
   readr::write_csv(index_null, paste0("validation/index/", s, "_index_null.csv"))
   index_null <- readr::read_csv(paste0("validation/index/", s, "_index_null.csv")) %>%
     mutate(ydummy = rep(.env$ydummy, each = length(1995:2020)))
