@@ -152,13 +152,13 @@ g <- index_gap %>%
   left_join(case_studies) %>%
   left_join(comparative_rho) %>%
   ggplot(aes(year, log(est))) +
-  geom_point(aes(shape = impute, colour = factor(gap))) +
+  geom_point(data = dplyr::filter(index_gap, impute), aes(shape = impute, colour = factor(gap))) +
   geom_line(linetype = 2, aes(colour = factor(gap))) +
-  geom_line(data = dplyr::filter(index_gap, year < year[which(.data$impute)[1]], .by = gap), aes(colour = factor(gap))) +
-  geom_line(data = dplyr::filter(index_gap, year > year[max(which(.data$impute))], .by = gap), aes(colour = factor(gap))) +
+  geom_line(data = dplyr::filter(index_gap, year < year[which(.data$impute)[1]], .by = c(gap, Name)), aes(colour = factor(gap))) +
+  geom_line(data = dplyr::filter(index_gap, year > year[max(which(.data$impute))], .by = c(gap, Name)), aes(colour = factor(gap))) +
   #expand_limits(y = 0) +
   facet_wrap(vars(Name), ncol = 2, scales = "free") +
-  geom_vline(aes(xintercept = year_new_vessel - 0.5), linetype = 2) +
+  #geom_vline(aes(xintercept = year_new_vessel - 0.5), linetype = 2) +
   scale_shape_manual(values = c("TRUE" = 1, "FALSE" = 16)) +
   guides(shape = "none") +
   labs(x = "Year", y = "log(Index)", colour = "Time gap") +
@@ -222,18 +222,20 @@ index_null <- lapply(1:nrow(case_studies), function(i) {
     mutate(Name = case_studies$Name[i],
            ydummy = rep(.env$ydummy, each = length(seq(case_studies$year_new_vessel[i], max(.data$year), 1))))
 }) %>%
-  bind_rows()
-
-g <- index_null %>%
+  bind_rows() %>%
   filter(!is.na(ydummy)) %>%
   mutate(area = grepl("NL", Name)) %>%
-  mutate(ydummy2 = ydummy - min(ydummy) + 1, .by = area) %>%
-  ggplot(aes(year, est)) +
-  geom_point(aes(colour = factor(ydummy2))) +
+  mutate(ydummy2 = ydummy - min(ydummy) + 1, .by = area)
+
+g <- index_null %>%
+  ggplot(aes(year, est, colour = factor(ydummy2))) +
+  geom_point(aes(shape = factor(year == ydummy))) +
   geom_line(aes(colour = factor(ydummy2))) +
   expand_limits(y = 0) +
   facet_wrap(vars(Name), ncol = 2, scales = "free") +
+  scale_shape_manual(values = c("TRUE" = 16, "FALSE" = NULL)) +
   labs(x = "Year", y = "Index", colour = "Dummy year change") +
+  guides(shape = "none") +
   theme(legend.position = "bottom", strip.background = element_blank())
 ggsave("manuscript/figures/index_dummy.png", g, height = 7, width = 6)
 
