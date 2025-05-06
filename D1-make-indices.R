@@ -55,6 +55,8 @@ set_intersect <- sf::st_intersects(
 # Table 23 for AIC comparisons (p. 125)
 # Table 24 for rho from M_1,1 (p. 132)
 # Table 31 for rho from M_2,3 (p. 152)
+#
+# Recommended values are in Tables 53-55 (p. 222)
 comparative_rho_summary <- data.frame(
   sp = c("redfish", "yt", "whitehake"),
   SVSPP = c(155, 105, 076),
