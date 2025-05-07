@@ -2,26 +2,21 @@
 library(tidyverse)
 theme_set(theme_bw())
 
-Names <- c("NL Cod", "NL G. halibut", "NE Redfish", "NE Y. flounder", "NE W. hake")
+Names <- c("NL Cod", "NL G. halibut", "NE butterfish", "NE Redfish", "NE W. hake", "NE Y. flounder")
 case_studies <- data.frame(
-  code = c("cod", "ghl", "redfish", "yt", "whitehake"),
-  Name = factor(Names, levels = Names)
+  code = c("cod", "ghl", "butterfish", "redfish", "whitehake", "yt"),
+  Name = factor(Names, levels = Names),
+  log_rho = c(2.072, 0.8913, log(c(1.487, 1.4564, 2.2354, 2.3619))),
+  lower = c(2.072 - 1.96 * 0.08256, 0.8913 - 1.96 * 0.0616, log(c(1.1137, 1.2224, 1.9214, 2.0357))),
+  upper = c(2.072 + 1.96 * 0.08256, 0.8913 + 1.96 * 0.0616, log(c(1.9862, 1.7351, 2.6008, 2.7403)))
 ) %>%
   mutate(dir = ifelse(grepl("NL", Name), "validation", "validation_nefsc"),
          year_new_vessel = ifelse(grepl("NL", Name), 1995, 2009))
 
-comparative_rho <- data.frame(
-  code = c("cod", "ghl", "redfish", "yt", "whitehake"),
-  Name = factor(Names, levels = Names),
-  log_rho = c(2.072, 0.8913, log(c(1.4564, 2.3619, 2.2354))),
-  lower = c(2.072 - 1.96 * 0.08256, 0.8913 - 1.96 * 0.0616, log(c(1.2224, 2.0357, 1.9214))),
-  upper = c(2.072 + 1.96 * 0.08256, 0.8913 + 1.96 * 0.0616, log(c(1.7351, 2.7403, 2.6008)))
-)
-
-log_rho_df <- lapply(1:nrow(comparative_rho), function(i) {
+log_rho_df <- lapply(1:nrow(case_studies), function(i) {
   rbind(
-    comparative_rho[i, ],
-    comparative_rho[i, ]
+    case_studies[i, c("code", "Name", "log_rho", "lower", "upper")],
+    case_studies[i, c("code", "Name", "log_rho", "lower", "upper")]
   ) %>%
     mutate(x = c(-Inf, Inf))
 }) %>%
@@ -51,13 +46,13 @@ index <- lapply(1:nrow(case_studies), function(i) {
 
 g <- index %>%
   #mutate(est = est, .by = Name) %>%
-  ggplot(aes(year, est, linetype = Model, shape = Model)) +
+  ggplot(aes(year, log(est), linetype = Model, shape = Model)) +
   #geom_point() +
   geom_line() +
   geom_vline(data = case_studies, aes(xintercept = year_new_vessel - 0.5), linetype = 2) +
-  labs(x = "Year", y = "Index") +
+  labs(x = "Year", y = "log(Index)") +
   facet_wrap(vars(Name), scales = "free", ncol = 2) +
-  expand_limits(y = 0) +
+  #expand_limits(y = 0) +
   scale_shape_manual(values = c(16, 1, 4)) +
   scale_linetype_manual(values = c(1, 2, 3)) +
   theme(legend.position = "bottom", strip.background = element_blank())
@@ -79,13 +74,13 @@ g <- index_ret %>%
   left_join(case_studies) %>%
   mutate(npeel = year_ret - year_new_vessel) %>%
   #mutate(est = est/mean(est), .by = Name) %>%
-  ggplot(aes(year, est, colour = factor(npeel))) +
+  ggplot(aes(year, log(est), colour = factor(npeel))) +
   #geom_point() +
   geom_line() +
-  expand_limits(y = 0) +
+  #expand_limits(y = 0) +
   geom_vline(data = case_studies, aes(xintercept = year_new_vessel - 0.5), linetype = 2) +
   facet_wrap(vars(Name), scales = "free", ncol = 2) +
-  labs(x = "Year", y = "Index", colour = "Elapsed years") +
+  labs(x = "Year", y = "log(Index)", colour = "Elapsed years") +
   theme(legend.position = "bottom", strip.background = element_blank())
 ggsave("manuscript/figures/index_retrospective.png", g, height = 7, width = 6)
 
@@ -123,7 +118,6 @@ vessel_effect_ret <- sfLapply(1:nrow(case_studies), function(i) {
 
 g <- vessel_effect_ret %>%
   left_join(case_studies) %>%
-  left_join(comparative_rho) %>%
   mutate(npeel = year_ret - year_new_vessel) %>%
   ggplot(aes(npeel, Estimate)) +
   geom_ribbon(data = log_rho_df, fill = "grey80", aes(x, ymin = lower, ymax = upper), inherit.aes = FALSE) +
@@ -150,16 +144,15 @@ index_gap <- lapply(1:nrow(case_studies), function(i) {
 
 g <- index_gap %>%
   left_join(case_studies) %>%
-  left_join(comparative_rho) %>%
   ggplot(aes(year, log(est))) +
-  geom_point(data = dplyr::filter(index_gap, impute), aes(shape = impute, colour = factor(gap))) +
+  geom_point(data = dplyr::filter(index_gap, impute), shape = 1, aes(colour = factor(gap))) +
   geom_line(linetype = 2, aes(colour = factor(gap))) +
   geom_line(data = dplyr::filter(index_gap, year < year[which(.data$impute)[1]], .by = c(gap, Name)), aes(colour = factor(gap))) +
   geom_line(data = dplyr::filter(index_gap, year > year[max(which(.data$impute))], .by = c(gap, Name)), aes(colour = factor(gap))) +
   #expand_limits(y = 0) +
   facet_wrap(vars(Name), ncol = 2, scales = "free") +
   #geom_vline(aes(xintercept = year_new_vessel - 0.5), linetype = 2) +
-  scale_shape_manual(values = c("TRUE" = 1, "FALSE" = 16)) +
+  #scale_shape_manual(values = c("TRUE" = 1, "FALSE" = 16)) +
   guides(shape = "none") +
   labs(x = "Year", y = "log(Index)", colour = "Time gap") +
   theme(legend.position = "bottom", strip.background = element_blank())
@@ -194,7 +187,6 @@ vessel_effect_gap <- sfLapply(1:nrow(case_studies), function(i) {
 
 g <- vessel_effect_gap %>%
   left_join(case_studies) %>%
-  left_join(comparative_rho) %>%
   ggplot(aes(sequence, Estimate)) +
   geom_ribbon(data = log_rho_df, fill = "grey80", aes(x, ymin = lower, ymax = upper), inherit.aes = FALSE) +
   #geom_hline(yintercept = log_rho_comparative$log_lower, linetype = 3) +
@@ -228,13 +220,13 @@ index_null <- lapply(1:nrow(case_studies), function(i) {
   mutate(ydummy2 = ydummy - min(ydummy) + 1, .by = area)
 
 g <- index_null %>%
-  ggplot(aes(year, est, colour = factor(ydummy2))) +
+  ggplot(aes(year, log(est), colour = factor(ydummy2))) +
   geom_point(aes(shape = factor(year == ydummy))) +
   geom_line(aes(colour = factor(ydummy2))) +
-  expand_limits(y = 0) +
+  #expand_limits(y = 0) +
   facet_wrap(vars(Name), ncol = 2, scales = "free") +
   scale_shape_manual(values = c("TRUE" = 16, "FALSE" = NULL)) +
-  labs(x = "Year", y = "Index", colour = "Dummy year change") +
+  labs(x = "Year", y = "log(Index)", colour = "Dummy year change") +
   guides(shape = "none") +
   theme(legend.position = "bottom", strip.background = element_blank())
 ggsave("manuscript/figures/index_dummy.png", g, height = 7, width = 6)
@@ -270,12 +262,8 @@ vessel_effect_null <- sfLapply(1:nrow(case_studies), function(i) {
 
 g <- vessel_effect_null %>%
   left_join(case_studies) %>%
-  left_join(comparative_rho) %>%
-  ggplot(aes(factor(sequence), Estimate)) +
-  #geom_ribbon(data = log_rho_df, fill = "grey80", aes(x, ymin = lower, ymax = upper), inherit.aes = FALSE) +
-  #geom_hline(yintercept = log_rho_comparative$log_lower, linetype = 3) +
-  #geom_hline(yintercept = log_rho_comparative$log_upper, linetype = 3) +
-  #geom_hline(aes(yintercept = log_rho), linetype = 2) +
+  mutate(ydummy = ifelse(grepl("NL", Name), 2005, 2015) + sequence - 1) %>%
+  ggplot(aes(factor(ydummy), Estimate)) +
   geom_hline(yintercept = 0, linetype = 2) +
   geom_point() +
   facet_wrap(vars(Name), ncol = 2, scales = "free") +

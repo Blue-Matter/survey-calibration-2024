@@ -58,19 +58,19 @@ set_intersect <- sf::st_intersects(
 #
 # Recommended values are in Tables 53-55 (p. 222)
 comparative_rho_summary <- data.frame(
-  sp = c("redfish", "yt", "whitehake"),
-  SVSPP = c(155, 105, 076),
-  model = c("M_1,1", "M_2,3", "M_1,1"),
-  rho = c(1.4564, 2.3619, 2.2354),
-  se = c(0.1301, 0.1791, 0.1726),
-  lower = c(1.2224, 2.0357, 1.9214),
-  upper = c(1.7351, 2.7403, 2.6008)
+  sp = c("redfish", "yt", "whitehake", "butterfish"),
+  SVSPP = c(155, 105, 076, 131),
+  model = c("M_1,1", "M_2,3", "M_1,1", "M_3,3"),
+  rho = c(1.4564, 2.3619, 2.2354, 1.487),
+  se = c(0.1301, 0.1791, 0.1726, 0.220),
+  lower = c(1.2224, 2.0357, 1.9214, 1.1137),
+  upper = c(1.7351, 2.7403, 2.6008, 1.9862)
 )
 
 
-#sp <- c("redfish", "yt", "whitehake")
+#sp <- c("redfish", "yt", "whitehake", "butterfish")
 #sp <- c("yt", "whitehake")
-sp <- "whitehake"
+sp <- "butterfish"
 
 for (s in sp) {
 
@@ -89,14 +89,23 @@ for (s in sp) {
   } else {
 
     catch_all <- readr::read_csv("validation_nefsc/Spring/22561_UNION_FSCS_SVCAT.csv") %>%
-      select(CRUISE6, STRATUM, TOW, STATION, SVSPP, EXPCATCHNUM, SCIENTIFIC_NAME) %>%
-      filter(SVSPP == '076')
+      select(CRUISE6, STRATUM, TOW, STATION, SVSPP, EXPCATCHNUM, SCIENTIFIC_NAME)
 
-    dat <- dat_set[set_intersect, ] %>%
-      left_join(catch_all) %>%
-      mutate(CATCH = ifelse(is.na(EXPCATCHNUM), 0, EXPCATCHNUM)) %>%
-      mutate(NPUE = EXPCATCHNUM/EFFORT) %>%
-      mutate(calibration = ifelse(SV_VESSEL == "AL", 2.235, 1)) # Species 076, see survdat:::apply_conversion_factors
+    if (s == "whitehake") {
+
+      dat <- dat_set[set_intersect, ] %>%
+        left_join(catch_all %>% filter(SVSPP == '076')) %>%
+        mutate(CATCH = ifelse(is.na(EXPCATCHNUM), 0, EXPCATCHNUM)) %>%
+        mutate(NPUE = EXPCATCHNUM/EFFORT) %>%
+        mutate(calibration = ifelse(SV_VESSEL == "AL", 2.235, 1)) # Species 076, see survdat:::apply_conversion_factors
+    } else if (s == "butterfish") {
+
+      dat <- dat_set[set_intersect, ] %>%
+        left_join(catch_all %>% filter(SVSPP == '131')) %>%
+        mutate(CATCH = ifelse(is.na(EXPCATCHNUM), 0, EXPCATCHNUM)) %>%
+        mutate(NPUE = EXPCATCHNUM/EFFORT) %>%
+        mutate(calibration = ifelse(SV_VESSEL == "AL", 1.487, 1)) # Species 131, see survdat:::apply_conversion_factors
+    }
   }
 
   .ggsave <- function(filename, ...) {
