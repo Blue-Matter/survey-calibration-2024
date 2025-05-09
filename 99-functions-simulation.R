@@ -11,7 +11,8 @@ sim_OM <- function(i, sim_design, seed = 10392,
   range <- sim_design$range[i]
   nyears <- sim_design$nyears[i]
   log_rho <- sim_design$log_rho[i]
-  st <- match.arg(sim_design$st[i], choices = c("rw", "iid"))
+  st <- match.arg(as.character(sim_design$st[i]), choices = c("rw", "iid"))
+  drift <- sim_design$drift[i]
 
   # Operating model ----
   nd <- expand.grid(X = seq(0, 1, cell_width), Y = seq(0, 1, cell_width)) %>%
@@ -38,24 +39,18 @@ sim_OM <- function(i, sim_design, seed = 10392,
   if (st == "rw") {
     epsilon_st <- array(NA, dim(delta_st), dimnames = list(age = 1, year = 1:nyears, cell = 1:nrow(nd)))
     epsilon_st[, 1, ] <- delta_st[, 1, ]
-    for (y in 2:nyears) epsilon_st[, y, ] <- epsilon_st[, y-1, ] + delta_st[, y, ]
+    for (y in 2:nyears) epsilon_st[, y, ] <- drift + epsilon_st[, y-1, ] + delta_st[, y, ]
   } else if (st == "iid") {
     epsilon_st <- delta_st
   }
 
-  beta <- data.frame(
-    year = seq(1, nyears)
-  ) %>%
-    mutate(beta_y = sim_design$beta_y_slope[i] * (year - 1))
-
   nd$omega_s <- omega_s[1, 1, ]
   nd_y <- right_join(nd, reshape2::melt(epsilon_st[1, , ])) %>%
     rename(epsilon_st = value) %>%
-    left_join(beta) %>%
     mutate(log_rho = ifelse(year > y_new_vessel, .env$log_rho, 0)) %>%
-    mutate(log_pred = omega_s + epsilon_st + log_rho + beta_y,
+    mutate(log_pred = omega_s + epsilon_st + log_rho,
            pred = exp(log_pred),
-           log_pred_pop = omega_s + epsilon_st + beta_y,
+           log_pred_pop = omega_s + epsilon_st,
            pred_pop = exp(log_pred_pop))
 
   return(nd_y)

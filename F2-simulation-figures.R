@@ -1,4 +1,6 @@
 
+library(tidyverse)
+
 # OM ----
 sim_design <- readr::read_csv("simulation/sim_design.csv")
 nd_y <- readRDS(file = "simulation/operating_model.rds")
@@ -7,7 +9,8 @@ nd_plot <- lapply(1:nrow(sim_design), function(i) {
   nd_y[[i]] %>%
     mutate(OM = paste("OM", i))
 }) %>%
-  bind_rows()
+  bind_rows() %>%
+  mutate(OM = factor(OM, sim_design$OM))
 
 index_om <- nd_plot %>%
   summarise(Population = sum(pred_pop),
@@ -33,7 +36,7 @@ for (i in 1:nrow(sim_design)) {
 
   # Spatiotemporal field
   g <- nd_y[[i]] %>%
-    mutate(year = paste("Year", year)) %>%
+    mutate(year = factor(paste("Year", year), paste("Year", 1:10))) %>%
     ggplot(aes(X, Y, fill = epsilon_st)) +
     geom_tile() +
     facet_wrap(vars(year)) +
@@ -122,11 +125,11 @@ rho_est <- lapply(OM_plot, function(i) {
 
 rho_stat <- rho_est %>%
   summarise(
-    log_rho = mean(log_rho),
     bias = mean(est - log_rho) %>% round(2),
     RMSE = sqrt(mean((est - log_rho)^2)) %>% round(2),
     .by = OM
-  )
+  ) %>%
+  left_join(sim_design)
 
 g <- ggplot(rho_est) +
   geom_histogram(aes(x = est), linewidth = 0.1, colour = "black", fill = "grey80") +
@@ -138,3 +141,22 @@ g <- ggplot(rho_est) +
   theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
 ggsave("simulation/figures/log_rho.png", g, height = 6, width = 5)
 
+
+# Compare trend
+index_trend <- index %>%
+  summarise(slope = lm(log(value) ~ year) |> coef() |> getElement(2),
+            .by = c(OM, Simulation))
+
+om_trend <- index_om2 %>%
+  summarise(slope = lm(log(value) ~ year) |> coef() |> getElement(2),
+            .by = OM)
+
+g <- ggplot(index_trend) +
+  geom_histogram(aes(x = slope), linewidth = 0.1, colour = "black", fill = "grey80") +
+  facet_wrap(vars(OM), ncol = 4) +
+  geom_vline(data = om_trend, aes(xintercept = slope), linetype = 2) +
+  #geom_label(data = rho_stat, aes(label = bias), x = Inf, y = Inf, hjust = "inward", vjust = "inward") +
+  #geom_label(data = rho_stat, aes(label = RMSE), x = -Inf, y = Inf, hjust = "inward", vjust = "inward") +
+  labs(x = "Index slope") +
+  theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
+ggsave("simulation/figures/index_slope.png", g, height = 6, width = 5)
