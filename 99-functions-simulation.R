@@ -1,7 +1,7 @@
 
 sim_OM <- function(i, sim_design, seed = 10392,
-                                y_new_vessel = ceiling(0.5 * nyears),
-                                cell_width = 0.02) {
+                   y_new_vessel = ceiling(0.5 * nyears),
+                   cell_width = 0.02) {
   set.seed(seed)
   require(tidyverse)
   require(SimSurvey)
@@ -59,7 +59,7 @@ sim_OM <- function(i, sim_design, seed = 10392,
 
 simulate_data <- function(om, phi = 1, nyears = 10,
                           y_new_vessel = ceiling(0.5 * nyears),
-                          seed, ...) {
+                          cluster = FALSE, seed, ...) {
   if (!missing(seed)) set.seed(seed)
   require(tidyverse)
   require(MASS)
@@ -67,7 +67,13 @@ simulate_data <- function(om, phi = 1, nyears = 10,
   n_annual <- 100
 
   dat <- lapply(1:nyears, function(y) {
-    cell_y <- sample(unique(om$cell), n_annual)
+    if (cluster) {
+      cell_y1 <- sample(unique(om$cell), ifelse(cluster, 0.5, 1) * n_annual)
+      cell_y2 <- pmin(cell_y1 + 1, max(om$cell))
+      cell_y <- c(cell_y1, cell_y2)
+    } else {
+      cell_y <- sample(unique(om$cell), ifelse(cluster, 0.5, 1) * n_annual)
+    }
     dplyr::filter(om, cell %in% cell_y, year == y)
   }) %>%
     bind_rows() %>%
@@ -78,10 +84,15 @@ simulate_data <- function(om, phi = 1, nyears = 10,
   return(dat)
 }
 
-fit_model_index <- function(dat, grid_pred, cell_area = 1, ...) {
+fit_model_index <- function(dat, grid_pred, cell_area = 1, get_se = FALSE, ...) {
 
   require(tidyverse)
   require(sdmTMB)
+
+  y_data <- unique(dat$year)
+  y_all <- seq(min(dat$year), max(dat$year))
+  y_extra <- setdiff(y_all, y_data)
+  extra_time <- if (length(y_extra)) y_extra else NULL
 
   mesh <- sdmTMB::make_mesh(dat, c("X", "Y"), n_knots = 100)
   fit <- sdmTMB(
@@ -89,6 +100,7 @@ fit_model_index <- function(dat, grid_pred, cell_area = 1, ...) {
     dat,
     mesh,
     time = "year",
+    extra_time = extra_time,
     spatiotemporal = "rw",
     family = nbinom2(),
     ...
@@ -97,22 +109,18 @@ fit_model_index <- function(dat, grid_pred, cell_area = 1, ...) {
   newdata <- grid_pred %>%
     mutate(new_vessel = FALSE)
 
-  #pred <- predict(
-  #  fit,
-  #  newdata = newdata,
-  #  return_tmb_object = TRUE
-  #)
-
   pred <- predict(
     fit,
     newdata = newdata,
-    return_tmb_object = FALSE
+    return_tmb_object = get_se
   )
 
-  index <- pred %>%
-    summarise(est = sum(exp(est) * cell_area), .by = year)
-
-  #index <- get_index(pred, bias_correct = FALSE, area = cell_area)
+  if (get_se) {
+    index <- get_index(pred, bias_correct = TRUE, area = cell_area)
+  } else {
+    index <- pred %>%
+      summarise(est = sum(exp(est) * cell_area), .by = year)
+  }
   sd_report <- summary(fit$sd_report, select = c("fixed", "report"))
 
   return(list(index = index, sd_report = sd_report))
