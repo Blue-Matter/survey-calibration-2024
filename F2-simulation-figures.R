@@ -145,7 +145,7 @@ g <- rho_ret %>%
             upper = quantile(Error, 0.975),
             .by = c(y, log_rho, cluster, OM, kappa, phi)) %>%
   mutate(row = paste0("log(rho)==", log_rho)) %>%
-  mutate(column = ifelse(cluster, "Random", "Cluster")) %>%
+  mutate(column = ifelse(!cluster, "Random", "Cluster")) %>%
   ggplot(aes(y, Error, colour = factor(kappa))) +
   geom_hline(yintercept = 0, linetype = 3) +
   geom_pointrange(fatten = 3.5, #shape = 1,
@@ -169,7 +169,7 @@ rho_ret_stat <- rho_ret %>%
   #mutate(y = factor(yret - 5)) %>%
   mutate(OM = factor(OM, levels = sim_design$OM)) %>%
   mutate(row = paste0("log(rho)==", log_rho)) %>%
-  mutate(column = ifelse(cluster, "Random", "Cluster"))
+  mutate(column = ifelse(!cluster, "Random", "Cluster"))
 
 g <- rho_ret_stat %>%
   ggplot(aes(y, RMSE, colour = factor(kappa))) +
@@ -189,7 +189,7 @@ ggsave("simulation/figures/rho_ret_RMSE.png", g, height = 6, width = 5)
 #g <- rho_ret %>%
 #  summarise(p_cover = mean(coverage), .by = c(y, OM, kappa, log_rho, cluster, phi)) %>%
 #  mutate(row = paste0("log(rho)==", log_rho)) %>%
-#  mutate(column = ifelse(cluster, "Random", "Cluster")) %>%
+#  mutate(column = ifelse(!cluster, "Random", "Cluster")) %>%
 #  ggplot(aes(y, p_cover, colour = factor(kappa), shape = factor(phi))) +
 #  #geom_point(position = position_dodge(0.6)) +
 #  #geom_hline(yintercept = 0, linetype = 3) +
@@ -211,7 +211,7 @@ ggsave("simulation/figures/rho_ret_RMSE.png", g, height = 6, width = 5)
 #g <- rho_ret %>%
 #  summarise(p_cover = mean(coverage_zero), .by = c(y, OM, kappa, log_rho, cluster, phi)) %>%
 #  mutate(row = paste0("log(rho)==", log_rho)) %>%
-#  mutate(column = ifelse(cluster, "Random", "Cluster")) %>%
+#  mutate(column = ifelse(!cluster, "Random", "Cluster")) %>%
 #  ggplot(aes(y, p_cover, colour = factor(kappa), shape = factor(phi))) +
 #  #geom_point(position = position_dodge(0.6)) +
 #  #geom_hline(yintercept = 0, linetype = 3) +
@@ -265,7 +265,31 @@ trend_ret <- lapply(OM_plot, function(i) {
   left_join(om_trend) %>%
   left_join(sim_design) %>%
   mutate(OM = factor(OM, levels = sim_design$OM)) %>%
-  mutate(y = factor(yret - 5), Error = slope - slope_om)
+  mutate(y = factor(yret - 5), Error = slope - slope_om) %>%
+  mutate(est_rho = TRUE)
+
+
+trend_ret_norho <- lapply(OM_plot, function(i) {
+
+  res <- readRDS(paste0("simulation/results_ret_", i, "_norho.rds"))
+  nsim <- length(res)
+  lapply(1:nsim, function(x) {
+    ans <- res[[x]]$index %>%
+      summarise(slope = lm(log(est) ~ year) |> coef() |> getElement(2), .by = yret) %>%
+      mutate(Simulation = x)
+
+    return(ans)
+  }) %>%
+    bind_rows() %>%
+    mutate(OM = paste("OM", i))
+
+}) %>%
+  bind_rows() %>%
+  left_join(om_trend) %>%
+  left_join(sim_design) %>%
+  mutate(OM = factor(OM, levels = sim_design$OM)) %>%
+  mutate(y = factor(yret - 5), Error = slope - slope_om) %>%
+  mutate(est_rho = FALSE)
 
 #g <- trend_ret %>%
 #  ggplot(aes(y, slope)) +
@@ -282,7 +306,7 @@ g <- trend_ret %>%
             upper = quantile(Error, 0.975),
             .by = c(y, log_rho, cluster, OM, kappa, phi)) %>%
   mutate(row = paste0("log(rho)==", log_rho)) %>%
-  mutate(column = ifelse(cluster, "Random", "Cluster")) %>%
+  mutate(column = ifelse(!cluster, "Random", "Cluster")) %>%
   ggplot(aes(y, Error, colour = factor(kappa))) +
   geom_hline(yintercept = 0, linetype = 3) +
   geom_pointrange(fatten = 3.5, #shape = 1,
@@ -300,20 +324,24 @@ ggsave("simulation/figures/slope_ret_error.png", g, height = 6, width = 5)
 
 
 
-trend_ret_stat <- trend_ret %>%
+trend_ret_stat <- rbind(
+  trend_ret, trend_ret_norho
+) %>%
   summarise(bias = mean(Error),
+            MARE = mean(abs(Error)),
             RMSE = sqrt(mean(Error^2)),
-            .by = c(y, OM)) %>%
+            .by = c(y, OM, est_rho)) %>%
   left_join(sim_design) %>%
   #mutate(y = factor(yret - 5)) %>%
   mutate(OM = factor(OM, levels = sim_design$OM)) %>%
   mutate(row = paste0("log(rho)==", log_rho)) %>%
-  mutate(column = ifelse(cluster, "Random", "Cluster"))
+  mutate(column = ifelse(!cluster, "Random", "Cluster"))
 
 g <- trend_ret_stat %>%
-  ggplot(aes(y, RMSE, colour = factor(kappa))) +
+  filter(est_rho) %>%
+  ggplot(aes(y, RMSE, colour = factor(kappa), ymin = 0, ymax = RMSE, group = OM)) +
   #geom_hline(yintercept = 0, linetype = 3) +
-  geom_pointrange(position = position_dodge(0.5), aes(ymin = 0, ymax = RMSE, group = OM, shape = factor(phi))) +
+  geom_pointrange(position = position_dodge(0.5), aes(shape = factor(phi))) +
   facet_grid(vars(row), vars(column), labeller = "label_parsed") +
   coord_cartesian(ylim = c(0, 0.2)) +
   scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
@@ -321,53 +349,12 @@ g <- trend_ret_stat %>%
        y = "RMSE in log(Index) slope",
        colour = expression(kappa),
        shape = expression(phi)) +
-  theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
+  theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank()) +
+  geom_pointrange(data = trend_ret_stat %>% filter(!est_rho), position = position_dodge(0.5), shape = 4, linetype = 3)
 ggsave("simulation/figures/slope_ret_RMSE.png", g, height = 6, width = 5)
 
 
 
-
-
-coverage_ret <- lapply(OM_plot, function(i) {
-
-  res <- readRDS(paste0("simulation/results_ret_", i, ".rds"))
-  nsim <- length(res)
-  lapply(1:nsim, function(x) {
-    res[[x]]$index %>% mutate(Simulation = x)
-  }) %>%
-    bind_rows() %>%
-    mutate(OM = paste("OM", i))
-
-}) %>%
-  bind_rows() %>%
-  left_join(index_om2) %>%
-  mutate(geom_mean_est = exp(mean(log(est))), .by = c(yret, Simulation, OM)) %>%
-  mutate(est = est/geom_mean_est, lwr = lwr/geom_mean_est, upr = upr/geom_mean_est) %>%
-  mutate(coverage = value < upr & value > lwr)
-
-g <- coverage_ret %>%
-  summarise(coverage_all_years = all(coverage), .by = c(yret, Simulation, OM)) %>%
-  summarise(p_cover = mean(coverage_all_years), .by = c(yret, OM)) %>%
-  left_join(sim_design) %>%
-  mutate(OM = factor(OM, levels = sim_design$OM)) %>%
-  mutate(y = factor(yret - 5)) %>%
-  mutate(row = paste0("log(rho)==", log_rho)) %>%
-  mutate(column = ifelse(cluster, "Random", "Cluster")) %>%
-  ggplot(aes(y, p_cover, colour = factor(kappa), shape = factor(phi))) +
-  #geom_point(position = position_dodge(0.6)) +
-  #geom_hline(yintercept = 0, linetype = 3) +
-  geom_pointrange(fatten = 3.5, #shape = 1,
-                  position = position_dodge(0.6),
-                  ymin = 0,
-                  aes(ymax = p_cover, group = OM, shape = factor(phi))) +
-  facet_grid(vars(row), vars(column), labeller = "label_parsed") +
-  scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
-  labs(x = "Years after vessel change",
-       y = "Index coverage",
-       colour = expression(kappa),
-       shape = expression(phi)) +
-  theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
-ggsave("simulation/figures/coverage_ret.png", g, height = 6, width = 5)
 
 
 
@@ -402,14 +389,14 @@ g <- rho_gap %>%
   theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
 ggsave("simulation/figures/rho_gap.png", g, height = 6, width = 5)
 
-#rho_gap_stat <- rho_gap %>%
-#  summarise(bias = mean(Error) %>% round(2),
-#            RMSE = sqrt(mean(Error^2)) %>% round(2),
-#            .by = c(ngap, OM)) %>%
-#  left_join(sim_design) %>%
-#  mutate(OM = factor(OM, levels = sim_design$OM)) %>%
-#  mutate(row = paste0("log(rho)==", log_rho)) %>%
-#  mutate(column = ifelse(cluster, "Random", "Cluster"))
+rho_gap_stat <- rho_gap %>%
+  summarise(bias = mean(Error) %>% round(2),
+            RMSE = sqrt(mean(Error^2)) %>% round(2),
+            .by = c(ngap, OM)) %>%
+  left_join(sim_design) %>%
+  mutate(OM = factor(OM, levels = sim_design$OM)) %>%
+  mutate(row = paste0("log(rho)==", log_rho)) %>%
+  mutate(column = ifelse(!cluster, "Random", "Cluster"))
 
 g <- rho_gap %>%
   summarise(median = median(Error),
@@ -417,7 +404,7 @@ g <- rho_gap %>%
             upper = quantile(Error, 0.975),
             .by = c(ngap, log_rho, cluster, OM, kappa, phi)) %>%
   mutate(row = paste0("log(rho)==", log_rho)) %>%
-  mutate(column = ifelse(cluster, "Random", "Cluster")) %>%
+  mutate(column = ifelse(!cluster, "Random", "Cluster")) %>%
   ggplot(aes(factor(ngap), Error, colour = factor(kappa))) +
   geom_hline(yintercept = 0, linetype = 3) +
   geom_pointrange(fatten = 3.5, #shape = 1,
@@ -434,12 +421,36 @@ g <- rho_gap %>%
 ggsave("simulation/figures/rho_gap_error.png", g, height = 6, width = 5)
 
 
+rho_gap_stat <- rho_gap %>%
+  summarise(bias = mean(Error),
+            RMSE = sqrt(mean(Error^2)),
+            .by = c(ngap, OM)) %>%
+  left_join(sim_design) %>%
+  mutate(OM = factor(OM, levels = sim_design$OM)) %>%
+  mutate(row = paste0("log(rho)==", log_rho)) %>%
+  mutate(column = ifelse(!cluster, "Random", "Cluster"))
+
+g <- rho_gap_stat %>%
+  ggplot(aes(ngap, RMSE, colour = factor(kappa))) +
+  #geom_hline(yintercept = 0, linetype = 3) +
+  geom_pointrange(position = position_dodge(0.5), aes(ymin = 0, ymax = RMSE, group = OM, shape = factor(phi))) +
+  facet_grid(vars(row), vars(column), labeller = "label_parsed") +
+  coord_cartesian(ylim = c(0, 0.6)) +
+  scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
+  labs(x = "Time gap between surveys",
+       y = expression("RMSE"~~widehat(log(rho))),
+       colour = expression(kappa),
+       shape = expression(phi)) +
+  theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
+ggsave("simulation/figures/rho_gap_RMSE.png", g, height = 6, width = 5)
+
 trend_gap <- lapply(OM_plot, function(i) {
 
   res <- readRDS(paste0("simulation/results_gap_", i, ".rds"))
   nsim <- length(res)
   lapply(1:nsim, function(x) {
     ans <- res[[x]]$index %>%
+      filter(!impute) %>%
       summarise(slope = lm(log(est) ~ year) |> coef() |> getElement(2), .by = ngap) %>%
       mutate(Simulation = x)
 
@@ -453,7 +464,31 @@ trend_gap <- lapply(OM_plot, function(i) {
   left_join(om_trend %>% filter(yret == 10)) %>%
   left_join(sim_design) %>%
   mutate(OM = factor(OM, levels = sim_design$OM)) %>%
-  mutate(Error = slope - slope_om)
+  mutate(Error = slope - slope_om) %>%
+  mutate(est_rho = TRUE)
+
+trend_gap_norho <- lapply(OM_plot, function(i) {
+
+  res <- readRDS(paste0("simulation/results_gap_", i, "_norho.rds"))
+  nsim <- length(res)
+  lapply(1:nsim, function(x) {
+    ans <- res[[x]]$index %>%
+      filter(!impute) %>%
+      summarise(slope = lm(log(est) ~ year) |> coef() |> getElement(2), .by = ngap) %>%
+      mutate(Simulation = x)
+
+    return(ans)
+  }) %>%
+    bind_rows() %>%
+    mutate(OM = paste("OM", i))
+
+}) %>%
+  bind_rows() %>%
+  left_join(om_trend %>% filter(yret == 10)) %>%
+  left_join(sim_design) %>%
+  mutate(OM = factor(OM, levels = sim_design$OM)) %>%
+  mutate(Error = slope - slope_om) %>%
+  mutate(est_rho = FALSE)
 
 #g <- trend_ret %>%
 #  ggplot(aes(y, slope)) +
@@ -470,7 +505,7 @@ g <- trend_gap %>%
             upper = quantile(Error, 0.975),
             .by = c(ngap, log_rho, cluster, OM, kappa, phi)) %>%
   mutate(row = paste0("log(rho)==", log_rho)) %>%
-  mutate(column = ifelse(cluster, "Random", "Cluster")) %>%
+  mutate(column = ifelse(!cluster, "Random", "Cluster")) %>%
   ggplot(aes(factor(ngap), Error, colour = factor(kappa))) +
   geom_hline(yintercept = 0, linetype = 3) +
   geom_pointrange(fatten = 3.5, #shape = 1,
@@ -487,6 +522,39 @@ g <- trend_gap %>%
 ggsave("simulation/figures/slope_gap_error.png", g, height = 6, width = 5)
 
 
+trend_gap_stat <- rbind(
+  trend_gap, trend_gap_norho
+) %>%
+  summarise(bias = mean(Error),
+            MARE = mean(abs(Error)),
+            RMSE = sqrt(mean(Error^2)),
+            .by = c(ngap, OM, est_rho)) %>%
+  left_join(sim_design) %>%
+  #mutate(y = factor(yret - 5)) %>%
+  mutate(OM = factor(OM, levels = sim_design$OM)) %>%
+  mutate(row = paste0("log(rho)==", log_rho)) %>%
+  mutate(column = ifelse(!cluster, "Random", "Cluster"))
+
+g <- trend_gap_stat %>%
+  filter(est_rho) %>%
+  ggplot(aes(ngap, RMSE, colour = factor(kappa), ymin = 0, ymax = RMSE, group = OM)) +
+  #geom_hline(yintercept = 0, linetype = 3) +
+  geom_pointrange(position = position_dodge(0.5), aes(shape = factor(phi))) +
+  facet_grid(vars(row), vars(column), labeller = "label_parsed") +
+  coord_cartesian(ylim = c(0, 0.3)) +
+  scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
+  labs(x = "Time gap between surveys",
+       y = "RMSE in log(Index) slope",
+       colour = expression(kappa),
+       shape = expression(phi)) +
+  theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank()) +
+  geom_pointrange(data = trend_gap_stat %>% filter(!est_rho),
+                  position = position_dodge(0.5),
+                  shape = 4, linetype = 3,
+                  show.legend = FALSE)
+ggsave("simulation/figures/slope_gap_RMSE.png", g, height = 6, width = 5)
+
+
 
 
 # Compare sampling ----
@@ -496,7 +564,7 @@ samp <- lapply(c(1:2, 7:8), function(i) {
     cbind(sim_design[i, ])
 }) %>%
   bind_rows() %>%
-  mutate(design = ifelse(cluster, "Cluster", "Random"), kappa = paste("kappa = ", kappa))
+  mutate(design = ifelse(!cluster, "Cluster", "Random"), kappa = paste("kappa = ", kappa))
 
 pop <- lapply(c(1:2, 7:8), function(i) {
   nd_y[[i]] %>%
@@ -504,7 +572,7 @@ pop <- lapply(c(1:2, 7:8), function(i) {
     cbind(sim_design[i, ])
 }) %>%
   bind_rows() %>%
-  mutate(design = ifelse(cluster, "Cluster", "Random"), kappa = paste("kappa = ", kappa))
+  mutate(design = ifelse(!cluster, "Cluster", "Random"), kappa = paste("kappa = ", kappa))
 
 
 g <- ggplot(pop, aes(X, Y)) +
@@ -516,3 +584,92 @@ g <- ggplot(pop, aes(X, Y)) +
   labs(fill = "log Density") +
   theme(strip.background = element_blank())
 ggsave("simulation/figures/sampling.png", g, height = 4, width = 6)
+
+
+# Summary error figures
+g1 <- rho_ret %>%
+  filter(!cluster) %>%
+  summarise(median = median(Error),
+            lower = quantile(Error, 0.025),
+            upper = quantile(Error, 0.975),
+            .by = c(y, log_rho, cluster, OM, kappa, phi)) %>%
+  mutate(row = paste0("log(rho)==", log_rho)) %>%
+  mutate(column = ifelse(!cluster, "Random", "Cluster")) %>%
+  ggplot(aes(y, Error, colour = factor(kappa))) +
+  geom_hline(yintercept = 0, linetype = 3) +
+  geom_pointrange(fatten = 3.5, #shape = 1,
+                  position = position_dodge(0.6),
+                  aes(y = median, ymin = lower, ymax = upper, group = OM, shape = factor(phi))) +
+  facet_wrap(vars(row), labeller = "label_parsed") +
+  coord_cartesian(ylim = c(-1.1, 1.1)) +
+  scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
+  labs(x = "Years after vessel change",
+       y = expression("Error"~~widehat(log(rho))),
+       colour = expression(kappa),
+       shape = expression(phi)) +
+  theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
+
+g2 <- rho_gap %>%
+  filter(!cluster) %>%
+  summarise(median = median(Error),
+            lower = quantile(Error, 0.025),
+            upper = quantile(Error, 0.975),
+            .by = c(ngap, log_rho, cluster, OM, kappa, phi)) %>%
+  mutate(row = paste0("log(rho)==", log_rho)) %>%
+  mutate(column = ifelse(!cluster, "Random", "Cluster")) %>%
+  ggplot(aes(ngap, Error, colour = factor(kappa))) +
+  geom_hline(yintercept = 0, linetype = 3) +
+  geom_pointrange(fatten = 3.5, #shape = 1,
+                  position = position_dodge(0.6),
+                  aes(y = median, ymin = lower, ymax = upper, group = OM, shape = factor(phi))) +
+  facet_wrap(vars(row), labeller = "label_parsed") +
+  coord_cartesian(ylim = c(-1.1, 1.1)) +
+  scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
+  labs(x = "Time gap between surveys",
+       y = expression("Error"~~widehat(log(rho))),
+       colour = expression(kappa),
+       shape = expression(phi)) +
+  theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
+
+g <- ggpubr::ggarrange(g1, g2, ncol = 1, common.legend = TRUE, legend = "bottom")
+ggsave("manuscript/figures/sim_rho_error.png", g, height = 5, width = 6)
+
+
+
+g1 <- trend_ret_stat %>%
+  filter(est_rho, !cluster) %>%
+  ggplot(aes(y, RMSE, colour = factor(kappa), ymin = 0, ymax = RMSE, group = OM)) +
+  #geom_hline(yintercept = 0, linetype = 3) +
+  geom_pointrange(position = position_dodge(0.5), aes(shape = factor(phi))) +
+  facet_wrap(vars(row), labeller = "label_parsed") +
+  coord_cartesian(ylim = c(0, 0.2)) +
+  scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
+  labs(x = "Years after vessel change",
+       y = "RMSE of trend",
+       colour = expression(kappa),
+       shape = expression(phi)) +
+  theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank()) +
+  geom_pointrange(data = trend_ret_stat %>% filter(!est_rho, !cluster),
+                  position = position_dodge(0.5), shape = 4, linetype = 3,
+                  show.legend = FALSE)
+
+g2 <- trend_gap_stat %>%
+  filter(est_rho, !cluster) %>%
+  ggplot(aes(ngap, RMSE, colour = factor(kappa), ymin = 0, ymax = RMSE, group = OM)) +
+  #geom_hline(yintercept = 0, linetype = 3) +
+  geom_pointrange(position = position_dodge(0.5), aes(shape = factor(phi))) +
+  facet_wrap(vars(row), labeller = "label_parsed") +
+  coord_cartesian(ylim = c(0, 0.2)) +
+  scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
+  labs(x = "Time gap between surveys",
+       y = "RMSE in trend",
+       colour = expression(kappa),
+       shape = expression(phi)) +
+  theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank()) +
+  geom_pointrange(data = trend_gap_stat %>% filter(!est_rho, !cluster),
+                  position = position_dodge(0.5),
+                  shape = 4, linetype = 3,
+                  show.legend = FALSE)
+
+g <- ggpubr::ggarrange(g1, g2, ncol = 1, common.legend = TRUE, legend = "bottom")
+ggsave("manuscript/figures/sim_trend_RMSE.png", g, height = 5, width = 6)

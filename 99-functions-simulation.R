@@ -84,7 +84,9 @@ simulate_data <- function(om, phi = 1, nyears = 10,
   return(dat)
 }
 
-fit_model_index <- function(dat, grid_pred, cell_area = 1, get_se = FALSE, ...) {
+fit_model_index <- function(dat,
+                            formula = obs ~ 1 + new_vessel,
+                            grid_pred, cell_area = 1, get_se = FALSE, ...) {
 
   require(tidyverse)
   require(sdmTMB)
@@ -96,7 +98,7 @@ fit_model_index <- function(dat, grid_pred, cell_area = 1, get_se = FALSE, ...) 
 
   mesh <- sdmTMB::make_mesh(dat, c("X", "Y"), n_knots = 100)
   fit <- sdmTMB(
-    obs ~ 1 + new_vessel,
+    formula,
     dat,
     mesh,
     time = "year",
@@ -125,4 +127,106 @@ fit_model_index <- function(dat, grid_pred, cell_area = 1, get_se = FALSE, ...) 
 
   return(list(index = index, sd_report = sd_report))
 
+}
+
+do_ret_sim <- function(dat_list, est_gear = TRUE) {
+  sfExport(list = c("est_gear"))
+
+  index_ret <- sfLapply(dat_list, function(dat, est_gear) {
+    require(dplyr)
+
+    if (est_gear) {
+      formula <- obs ~ 1 + new_vessel
+    } else {
+      formula <- obs ~ 1
+    }
+
+    yret <- 6:10
+
+    out <- lapply(yret, function(y) {
+      dat_y <- dplyr::filter(dat, year <= y)
+      grid_pred <- dplyr::select(om, X, Y, year) %>%
+        dplyr::filter(year <= y)
+      try(fit_model_index(dat_y, formula, grid_pred = grid_pred, cell_area = cell_width^2, get_se = TRUE),
+          silent = TRUE)
+    })
+
+    index <- lapply(1:length(yret), function(y) {
+      if (!is.character(out[[y]])) {
+        dplyr::mutate(out[[y]]$index, yret = yret[y])
+      } else {
+        data.frame()
+      }
+    }) %>%
+      bind_rows()
+
+    sd_report <- lapply(1:length(yret), function(y) {
+
+      if (!is.character(out[[y]])) {
+        out[[y]]$sd_report %>%
+          as.data.frame() %>%
+          dplyr::mutate(yret = yret[y], par_name = rownames(.))
+      } else {
+        data.frame()
+      }
+
+    }) %>%
+      bind_rows()
+
+    return(list(index = index, sd_report = sd_report))
+  }, est_gear = est_gear)
+
+  return(index_ret)
+}
+
+do_gap_sim <- function(dat_list, est_gear = TRUE) {
+  sfExport(list = c("est_gear"))
+
+  index_gap <- sfLapply(dat_list, function(dat, est_gear) {
+    require(dplyr)
+
+    if (est_gear) {
+      formula <- obs ~ 1 + new_vessel
+    } else {
+      formula <- obs ~ 1
+    }
+
+    ygap <- 6:9
+
+    out <- lapply(1:length(ygap), function(y) {
+      ymissing <- seq(ygap[1], ygap[y])
+      dat_y <- dplyr::filter(dat, !year %in% ymissing)
+      grid_pred <- dplyr::select(om, X, Y, year)
+      try(fit_model_index(dat_y, formula, grid_pred = grid_pred, cell_area = cell_width^2, get_se = TRUE),
+          silent = TRUE)
+    })
+
+    index <- lapply(1:length(ygap), function(y) {
+      ymissing <- seq(ygap[1], ygap[y])
+      if (!is.character(out[[y]])) {
+        dplyr::mutate(out[[y]]$index, impute = year %in% ymissing, ngap = length(ymissing))
+      } else {
+        data.frame()
+      }
+    }) %>%
+      bind_rows()
+
+    sd_report <- lapply(1:length(ygap), function(y) {
+      ymissing <- seq(ygap[1], ygap[y])
+      ngap <- length(ymissing)
+      if (!is.character(out[[y]])) {
+        out[[y]]$sd_report %>%
+          as.data.frame() %>%
+          dplyr::mutate(ngap = ngap, par_name = rownames(.))
+      } else {
+        data.frame()
+      }
+
+    }) %>%
+      bind_rows()
+
+    return(list(index = index, sd_report = sd_report))
+  }, est_gear = est_gear)
+
+  return(index_gap)
 }

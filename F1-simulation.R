@@ -43,90 +43,30 @@ for (i in 1:nrow(sim_design)) {
   #saveRDS(dat_list, paste0("simulation/dat_list_", i, ".rds"))
   dat_list <- readRDS(paste0("simulation/dat_list_", i, ".rds"))
 
-
   # Run retrospective ----
   sfExport(list = c("fit_model_index", "om", "i", "cell_width"))
   tictoc::tic()
-  index_ret <- sfLapply(dat_list, function(dat) {
-    require(dplyr)
-
-    yret <- 6:10
-
-    out <- lapply(yret, function(y) {
-      dat_y <- dplyr::filter(dat, year <= y)
-      grid_pred <- dplyr::select(om, X, Y, year) %>%
-        dplyr::filter(year <= y)
-      try(fit_model_index(dat_y, grid_pred = grid_pred, cell_area = cell_width^2, get_se = TRUE), silent = TRUE)
-    })
-
-    index <- lapply(1:length(yret), function(y) {
-      if (!is.character(out[[y]])) {
-        dplyr::mutate(out[[y]]$index, yret = yret[y])
-      } else {
-        data.frame()
-      }
-    }) %>%
-      bind_rows()
-
-    sd_report <- lapply(1:length(yret), function(y) {
-
-      if (!is.character(out[[y]])) {
-        out[[y]]$sd_report %>%
-          as.data.frame() %>%
-          dplyr::mutate(yret = yret[y], par_name = rownames(.))
-      } else {
-        data.frame()
-      }
-
-    }) %>%
-      bind_rows()
-
-    return(list(index = index, sd_report = sd_report))
-  })
+  index_ret <- do_ret_sim(dat_list)
   tictoc::toc()
   saveRDS(index_ret, paste0("simulation/results_ret_", i, ".rds"))
 
+  # Retrospective w/o gear effect
   tictoc::tic()
-  index_gap <- sfLapply(dat_list, function(dat) {
-    require(dplyr)
+  index_ret_norho <- do_ret_sim(dat_list, FALSE)
+  tictoc::toc()
+  saveRDS(index_ret_norho, paste0("simulation/results_ret_", i, "_norho.rds"))
 
-    ygap <- 6:9
-
-    out <- lapply(1:length(ygap), function(y) {
-      ymissing <- seq(ygap[1], ygap[y])
-      dat_y <- dplyr::filter(dat, !year %in% ymissing)
-      grid_pred <- dplyr::select(om, X, Y, year)
-      try(fit_model_index(dat_y, grid_pred = grid_pred, cell_area = cell_width^2, get_se = TRUE), silent = TRUE)
-    })
-
-    index <- lapply(1:length(ygap), function(y) {
-      ymissing <- seq(ygap[1], ygap[y])
-      if (!is.character(out[[y]])) {
-        dplyr::mutate(out[[y]]$index, impute = year %in% ymissing, ngap = length(ymissing))
-      } else {
-        data.frame()
-      }
-    }) %>%
-      bind_rows()
-
-    sd_report <- lapply(1:length(ygap), function(y) {
-      ymissing <- seq(ygap[1], ygap[y])
-      ngap <- length(ymissing)
-      if (!is.character(out[[y]])) {
-        out[[y]]$sd_report %>%
-          as.data.frame() %>%
-          dplyr::mutate(ngap = ngap, par_name = rownames(.))
-      } else {
-        data.frame()
-      }
-
-    }) %>%
-      bind_rows()
-
-    return(list(index = index, sd_report = sd_report))
-  })
+  # Run gap ----
+  tictoc::tic()
+  index_gap <- do_gap_sim(dat_list)
   tictoc::toc()
   saveRDS(index_gap, paste0("simulation/results_gap_", i, ".rds"))
+
+  # Run gap w/o gear effect ----
+  tictoc::tic()
+  index_gap_norho <- do_gap_sim(dat_list, FALSE)
+  tictoc::toc()
+  saveRDS(index_gap_norho, paste0("simulation/results_gap_", i, "_norho.rds"))
 
 }
 
