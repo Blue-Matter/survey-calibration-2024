@@ -239,8 +239,9 @@ index_om2 <- index_om %>%
 om_trend <- lapply(6:10, function(yret) {
   index_om2 %>%
     filter(year <= yret) %>%
-    summarise(slope_om = lm(log(value) ~ year) |> coef() |> getElement(2), .by = OM) %>%
-    mutate(yret = yret)
+    mutate(yret = .env$yret) %>%
+    filter(year > yret - 5) %>% # 5 year moving average
+    summarise(slope_om = lm(log(value) ~ year) |> coef() |> getElement(2), .by = c(yret, OM))
 }) %>%
   bind_rows()
 
@@ -252,6 +253,7 @@ trend_ret <- lapply(OM_plot, function(i) {
   nsim <- length(res)
   lapply(1:nsim, function(x) {
     ans <- res[[x]]$index %>%
+      filter(year > yret - 5) %>%
       summarise(slope = lm(log(est) ~ year) |> coef() |> getElement(2), .by = yret) %>%
       mutate(Simulation = x)
 
@@ -275,6 +277,7 @@ trend_ret_norho <- lapply(OM_plot, function(i) {
   nsim <- length(res)
   lapply(1:nsim, function(x) {
     ans <- res[[x]]$index %>%
+      filter(year > yret - 5) %>%
       summarise(slope = lm(log(est) ~ year) |> coef() |> getElement(2), .by = yret) %>%
       mutate(Simulation = x)
 
