@@ -49,10 +49,10 @@ g <- ggplot(index_design, aes(year, MeanAbuT, shape = vessel)) +
   geom_line() +
   geom_line(aes(y = MeanAbuT - 1.96 * sqrt(varabu)), linetype = 2) +
   geom_line(aes(y = MeanAbuT + 1.96 * sqrt(varabu)), linetype = 2) +
-  geom_linerange(data = index_design %>% filter(year >= 2019),
-                 aes(ymin = MeanAbuT - 1.96 * sqrt(varabu), ymax = MeanAbuT + 1.96 * sqrt(varabu))
+  geom_linerange(
+    data = index_design %>% filter(year >= 2019),
+    aes(ymin = MeanAbuT - 1.96 * sqrt(varabu), ymax = MeanAbuT + 1.96 * sqrt(varabu))
   ) +
-  #facet_wrap(vars(type)) +
   expand_limits(y = 0) +
   scale_shape_manual(values = c("HM" = 4, "TA" = 16, "PA" = 1, "NA" = NA)) +
   labs(x = "Year", y = "Design index", shape = "Vessel") +
@@ -139,8 +139,9 @@ g <- ggplot(index_ret, aes(year, est, group = yret, colour = factor(yret))) +
   expand_limits(y = 0) +
   scale_shape_manual(values = c("HM" = 4, "TA" = 16, "PA" = 1, "NA" = NA)) +
   labs(x = "Year", y = "Tarajoq index", shape = "Vessel", colour = "Terminal year") +
-  theme(legend.position = "bottom", panel.spacing = unit(0, 'in'))
-ggsave("calibration_ghl/figures/index_compare_ret.png", g, height = 3, width = 4)
+  theme(legend.position = "bottom", panel.spacing = unit(0, 'in'),
+        legend.box = "vertical")
+ggsave("calibration_ghl/figures/index_compare_ret.png", g, height = 3.5, width = 4)
 
 g <- ggplot(index_ret, aes(year, est, group = yret)) +
   geom_line() +
@@ -159,7 +160,7 @@ ygap <- 2022:2023
 
 index_gap <- rbind(
   read.csv("calibration_ghl/index/index_full.csv") %>% mutate(type = "All vessels"),
-  read.csv("calibration_ghl/index/index_gap_2023.csv") %>% mutate(type = "ex-2023"),
+  read.csv("calibration_ghl/index/index_gap_2023.csv") %>% mutate(type = "ex-22/23"),
   read.csv("calibration_ghl/index/index_gap_2022.csv") %>% mutate(type = "ex-2022")
 ) %>%
   left_join(survey_vessel)
@@ -173,8 +174,9 @@ g <- ggplot(index_gap, aes(year, est, group = type, colour = factor(type))) +
   expand_limits(y = 0) +
   scale_shape_manual(values = c("HM" = 4, "TA" = 16, "PA" = 1, "NA" = NA)) +
   labs(x = "Year", y = "Tarajoq index", shape = "Vessel", colour = "Data") +
-  theme(legend.position = "bottom", panel.spacing = unit(0, 'in'))
-ggsave("calibration_ghl/figures/index_compare_gap.png", g, height = 3, width = 4)
+  theme(legend.position = "bottom", panel.spacing = unit(0, 'in'),
+        legend.box = "vertical")
+ggsave("calibration_ghl/figures/index_compare_gap.png", g, height = 3.5, width = 4)
 
 g <- ggplot(index_gap, aes(year, est, group = type, colour = factor(type))) +
   geom_line() +
@@ -213,7 +215,7 @@ rho_ret <- Map(get_rho, filename = filename, name = name_ret) %>%
 # Gap
 ygap <- 2022:2023
 filename2 <- paste0("calibration_ghl/models/fit_gap_", ygap, ".rds")
-name_gap <- paste0("ex-", ygap)
+name_gap <- c("ex-2022", "ex-22/23")
 rho_gap <- Map(get_rho, filename = filename2, name = name_gap) %>%
   bind_rows()
 
@@ -254,7 +256,6 @@ fit_null <- readRDS(file = "calibration_ghl/models/fit_null.rds")
 rho_null <- Map(get_rho, fit = fit_null, name = ytest) %>%
   bind_rows() %>%
   filter(grepl("new_gear", term))
-  filter()
 
 g <- ggplot(rho_null, aes(type, estimate, ymin = conf.low, ymax = conf.high)) +
   geom_point() +
@@ -266,9 +267,13 @@ ggsave("calibration_ghl/figures/dummy_test.png", g, height = 3, width = 3)
 #### Residuals ----
 if (FALSE) {
 
+  library(sdmTMB)
+
   fit <- readRDS(file = "calibration_ghl/models/fit.rds")
-  fit_sims <- simulate(fit, nsim = 1000)
+  fit_sims <- sdmTMB:::simulate.sdmTMB(fit, nsim = 1000)
   pred <- exp(predict(fit)$est)
+
+  # Plot residuals
 
   library(DHARMa)
   res <- DHARMa::createDHARMa(fit_sims, fit$data$num, pred, integerResponse = TRUE)
@@ -278,6 +283,9 @@ if (FALSE) {
   testOutliers(res)
   testSpatialAutocorrelation(res, x = fit$data$X, y = fit$data$Y)
   testTemporalAutocorrelation(res, time = fit$data$year)
+
+  recalculateResiduals(res, fit$data$year) %>%
+    testTemporalAutocorrelation(time = unique(fit$data$year))
 
   hist(res$scaledResiduals)
 }

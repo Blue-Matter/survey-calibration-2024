@@ -1,7 +1,7 @@
 
 library(tidyverse)
 
-# All data from 0A-0B (provided by Kevin, 05-22-2025)
+#### All data from 0A-0B ----
 CAN <- readxl::read_excel(
   file.path("Data 2025", "AllYearsAreasGreenland HalibutData.xlsx")
 )
@@ -14,9 +14,8 @@ CAN <- readxl::read_excel(
 #  facet_wrap(vars(Year)) +
 #  scale_colour_viridis_c(trans = 'sqrt')
 
-# Greenland data since 2023 (provided by Kevin, 05-22-2025)
+#### Greenland data since 2023 ----
 ghl_TA <- local({
-
   station <- read.csv(file.path("Data 2025", "D_hauls_GHLW_2023-2024.csv.csv"))
   ghl_catch <- read.csv(file.path("Data 2025", "D_FISH_GHLW_2024-2024.csv"))
 
@@ -26,20 +25,43 @@ ghl_TA <- local({
 })
 #table(ghl_TA$year, ghl_TA$Stratum1) %>% t()
 
-# GHL sets prior to 2020
+#### GHL sets prior to 2023 (use 1CD subset) ----
 # Missing 2000, 2002, 2003, 2005-7, 2009, 2011, 2013
 ghl_PA <- read.csv(
   file.path("Data pre-2025", "D1_CPUE_NPUE_WGHL_99-23_GHLCombine0A1CD6stra0A 35cmGearVinfo.csv.csv")
 ) %>%
-  filter(div %in% c("1C", "1D"), year <= 2020)
-#table(ghl$year, ghl$div) %>% t()
+  filter(div %in% c("1C", "1D"), year < 2023)
+#table(ghl_PA$year, ghl_PA$div) %>% t()
+#table(ghl_PA$year, ghl_PA$div) %>% t() %>% colSums()
 
+# Add sets from missing years
+ghl_PA2 <- local({
+  # GHL sets in 1CD until 2022 (Paamiut, Helga Maria)
+  # Spreadsheet is missing swept area for 2022 Tarajoq sets and catch rates
+  ghl_PA2_pos <- read.csv(
+    file.path("Data pre-2025", "D_hauls_GHLW_1997-2022.csv")
+  ) %>%
+    filter(!year %in% unique(ghl_PA$year))
+  #table(ghl_PA2$year, ghl_PA$div) %>% t() %>% colSums()
 
-# Make master spread sheet
+  # Spreadsheet of catch rates provided by Margaret Treble, 2022
+  ghl_sets <- read.csv(
+    file.path("Data pre-2025", "DS3_Survey 1CD_ kg.num Densitykg Densitynum Per Station 1997-2019 StepTGadget.csv")
+  ) %>%
+    filter(!year %in% unique(ghl_PA$year)) %>%
+    select(year, ship, trip, haul, sweptarea, kg, num) %>%
+    left_join(ghl_PA2_pos %>% select(!sweptarea))
+  ghl_sets
+})
+
+#### Make master spread sheet ----
 ghl <- rbind(
   select(
     ghl_PA, year, id.2, sweptarea, depth, div, Stratum2, npos, wpos, num, kg, vessel
   ),
+  select(
+    ghl_PA2, year, id.2, sweptarea, depth, Stratum1, Stratum2, npos, wpos, num, kg, ship
+  ) %>% rename(div = Stratum1, vessel = ship),
   select(
     ghl_TA, year, id.2, sweptarea, depth, Stratum1, Stratum2, npos, wpos, num, kg, ship
   ) %>% rename(div = Stratum1, vessel = ship),
@@ -68,11 +90,13 @@ ghl <- rbind(
          vessel = factor(vessel, levels = c("PA", "HM", "TA")))
 #readr::write_csv(ghl, "calibration_ghl/ghl_sets.csv")
 
+#table(ghl$year, ghl$div)
+
 dat <- sdmTMB::add_utm_columns(ghl, ll_names = c("wpos", "npos"), utm_crs = 32621)
 
 source('99-functions-calibration.R')
 
-# Prepare prediction grid
+#### Prepare prediction grid ----
 grid <- read.csv("calibration_ghl/grid_0AB1CD.csv") %>%
   sdmTMB::add_utm_columns(ll_names = c("X", "Y"), ll_crs = 32621,
                           utm_names = c("lon", "lat"), utm_crs = 4326, units = "m") %>%
@@ -81,7 +105,7 @@ grid <- read.csv("calibration_ghl/grid_0AB1CD.csv") %>%
 
 grid_ex0B <- filter(grid, div != "0B")
 
-# Fit calibration Tarajoq + Helga Maria
+#### Fit calibration Tarajoq + Helga Maria ----
 tictoc::tic()
 fit <- fit_ghl(dat, formula = num ~ 1 + vessel)
 tictoc::toc()
@@ -95,7 +119,7 @@ index_ex0B <- make_index(fit, grid_ex0B)
 readr::write_csv(index_ex0B, file = "calibration_ghl/index/index_full_ex0B.csv")
 
 
-## Fit calibration ex. HM
+#### Fit calibration ex. HM ----
 tictoc::tic()
 fit_exHM <- dat %>%
   filter(vessel != "HM") %>%
@@ -108,7 +132,7 @@ fit_exHM <- readRDS(file = "calibration_ghl/models/fit_exHM.rds")
 index <- make_index(fit_exHM, grid)
 readr::write_csv(index, file = "calibration_ghl/index/index_exHM.csv")
 
-# Fit w/o calibration
+#### Fit w/o calibration ----
 tictoc::tic()
 fit_norho <- fit_ghl(dat, formula = num ~ 1)
 tictoc::toc()
@@ -119,7 +143,7 @@ index <- make_index(fit_norho, grid)
 readr::write_csv(index, file = "calibration_ghl/index/index_norho.csv")
 
 
-# Retrospective ex 2024, ex 2023-24
+#### Retrospective ex 2024, ex 2023-24 ----
 yret <- c(2022, 2023)
 library(snowfall)
 sfInit(TRUE, length(yret))
@@ -136,13 +160,13 @@ fit_ret <- sfLapply(yret, function(y, dat, grid) {
   invisible()
 }, dat = dat, grid = grid)
 
-# Gap ex 2022 or 2023
+#### Gap ex 2022 or 2023 ----
 ygap <- c(2022, 2023)
 
 fit_gap <- sfLapply(ygap, function(y, dat, grid) {
   require(dplyr)
   fit_gap <- dat %>%
-    filter(year != y) %>%
+    filter(!year %in% seq(2022, y)) %>%
     fit_ghl()
   saveRDS(fit_gap, file = paste0("calibration_ghl/models/fit_gap_", y, ".rds"))
 
@@ -154,7 +178,7 @@ fit_gap <- sfLapply(ygap, function(y, dat, grid) {
 sfStop()
 
 
-# False positive test
+#### False positive test ----
 ytest <- 2013:2017
 library(snowfall)
 sfInit(TRUE, length(ytest))
@@ -170,34 +194,3 @@ fit_null <- sfLapply(ytest, function(y, dat) {
 sfStop()
 
 saveRDS(fit_null, file = "calibration_ghl/models/fit_null.rds")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Greenland data prior to 2020 (provided by Margaret Treble, 2022)
-#ghl_PA_coord <- read.csv( # get coordinates
-#  file.path("Data 2025", "DS4_Survey 1CD400-1500m BiologicalData 03-19 Margaret.csv")
-#) %>%
-#  summarise(npos = unique(npos), wpos = unique(wpos), .by = c(id, year, ship, trip, haul))
-#
-#ghl_PA <- read.csv(
-#  file.path("Data 2025", "DS3_Survey 1CD_ kg.num Densitykg Densitynum Per Station 1997-2019 StepTGadget.csv")
-#) %>%
-#  mutate(area = strsplit(id_str, "_") %>% sapply(getElement, 1)) %>%
-#  mutate(id.2 = paste(year, trip, ship, haul, sep = "_")) %>%
-#  filter(!id.2 %in% ghl$id.2) #%>%
-#left_join(ghl_PA_coord) %>%
-#filter(is.na(npos))
-#readr::write_csv(ghl_PA, file = "Data 2025/1CD_missing_latlon.csv")
-
-
