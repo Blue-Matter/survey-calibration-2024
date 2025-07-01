@@ -3,3 +3,10 @@ _book
 csl
 knitr-figs-docx
 .Rhistory
+
+*/figures/
+*manuscript/manuscript.docx
+*manuscript_template.docx
+shapefiles/
+validation_size
+*powerpoint/

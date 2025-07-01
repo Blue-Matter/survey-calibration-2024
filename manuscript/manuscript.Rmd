@@ -1,0 +1,370 @@
+---
+title: "A novel approach to standardize indices of abundance with calibration factors without comparative fishing"
+author: "Quang C. Huynh and others TBD"
+date: "Intended for publication in Fisheries Research or CJFAS"
+output: 
+  bookdown::word_document2:
+    reference_docx: "manuscript_template.docx"
+    citation_package: biblatex
+    global_numbering: true
+bibliography: "refs.bib"
+link-citations: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	out.width = "6in",
+	warning = TRUE,
+	warnings = TRUE
+)
+library(flextable)
+library(tidyverse)
+```
+
+\newpage
+
+# Abstract
+
+Fishery-independent indices of abundance are important inputs for stock assessment and empirical control rules for the purpose of fisheries management.
+Change in survey protocols may hinder index standardization due to conflation between population abundance and changes in catchability.
+Typically, comparative fishing (CF) experiments directly estimate the relative catchability between vessels to calibrate survey catch rates.
+However, if direct estimates are not possible, then we propose the use of spatiotemporal models to indirectly estimate the calibration factor as part of the index standardization.
+Indirect estimates are possible without CF data if the population process in the spatiotemporal model are not independent across time steps.
+Six case studies for species with CF data indicate that indices from indirect calibration are similar in trend as those from direct calibration.
+While the precision of the calibration factor is lower with indirect calibration than with direct calibration, indirect calibration performed better than no calibration and provided a way to stitch indices together.
+Statistical diagnostics can be used to support or reject the suitability of indirect calibration when comparison to direct calibration is not possible in real world cases.
+Simulation study additionally supported the use of indirect calibration.
+We propose indirect calibration as an additional toolkit for ecologists when unforseen circumstances prevent comparative fishing experiments.
+
+\newpage
+
+# Introduction
+
+Indices of abundance estimated from catch rates in research surveys are valuable for assessing and informing management of population trends in fish stocks.
+Research surveys have standardized protocols for sampling design, i.e., standardized fishing vessel, gear, and set locations, to ensure catch rates are proportional to stock density and minimize factors that alter catchability of the resource.
+
+Over time, changes in survey design are needed as vessels and fishing gear require replacement due to wear and tear. 
+The new fishing gear employed in the survey may have a different catchability.
+For example, there may be changes in survey objectives where a reduction in the mesh size maximizes catchability of various species for stock assessment, or updates in technology that warrants use of a new trawl design.
+
+The ability to use to catch rates across the change in survey methodology is compromised when catchability changes.
+If the difference in catchability is not known, then there is effectively be a break in the index of abundance time series. The index from the old survey is a historical series may still inform past stock trends but is less useful to inform trends relative to the current time period.
+Additional time is required to build the time series of the new survey, resulting in a time lag when the new survey can be used.
+
+To mitigate these shortcomings, the relative catchability between surveys can be estimated through a one-time comparative fishing (CF) experiment.
+Before the retirement of the old gear, catch rates from the old vessel and gear are compared in a common set of spatial and temporal strata.
+Assuming the underlying stock density is identical for both gears, the difference in catch rates in a joint set is attributed to relative catchability $\rho$ (typically referred to as the "calibration factor" or "vessel effect"). 
+To develop the index of abundance across both vessels, catch rates from the old survey can be adjusted by the calibration factor to obtain the hypothetical values had the new survey protocol operated throughout the entire time series.
+
+Logistical challenges may preclude the possibility for CF experiments. For example, the research vessel (RV) *Paamiut* with the Alfredo III trawl that executed the trawl survey in NAFO Subarea 0/1 was decommissioned ahead of schedule as it was no longer seaworthy [@hedges2023].
+The replacement vessel, the RV *Tarajoq* utilizing the Cosmos trawl only become operational in 2022.
+Thus, comparative fishing experiments were not logistically possible to calibrate indices between these two vessels.
+As a result, a gap in the survey exists between 2017 and 2022 [@hedges2023].
+
+This survey gap compromises the ability to provide science advice for the management of NAFO Subarea 0/1 (Offshore) Greenland halibut (*Reinhardtius hippoglossoides*) where catch advice has historically been provided with an index-based control rule [@jorgensen2016]. 
+More time would be needed to update the control rule, where the total allowable catch is adjusted from the trend in the index in the preceding 7 years, solely from the index from the RV *Tarajoq*. 
+However, the control rule could be updated quicker if the index can be stitched with the old survey data.
+
+This paper evaluates the potential to use spatiotemporal models to stitch indices across different time periods in the absence of CF.
+Spatiotemporal models are a form of GLMMs (genearlized linear mixed models) that predict patterns in stock abundance across space and time [@thorson2019], and is an increasingly popular and flexible approach to standardizing indices of abundance with data from multiple sources [@monnahan2021; @gruss2019].
+The advantage of this approach includes the ability to impute abundance in unsampled time-area strata for the index calculation, which would otherwise not be possible with the design-based index approach, resulting from changes in survey sampling design [@yalcin2023; @anderson2025].
+As with any index standardization procedure using linear models, fixed effects and additional random effects can account for habitat or catchability covariates that affect catch rates [@thorson2019; @thorson2014].
+
+Here, $\rho$ would be directly estimated as a fixed effect which can then be used to generate an index across the vessel change, i.e., $\rho$ subsequently applied for all years of the survey.
+This approach raises the question of how $\rho$ is estimable without CF.
+A typical index standardization estimates year effects corresponding to stock abundance as independent fixed effects, in which case, the year effects are confounded with $\rho$ when the survey protocol changed.
+
+However, $\rho$ is identifiable with a predictive model for the population process over time is included, as demonstrated if an index standardization model were a linear regression with respect to time (Figure \@ref(fig:simple-example)). 
+The predictive model is the regression slope and there are sufficient degrees of freedom to estimate a discontinuity in the regression arising from the vessel effect as a second intercept term.
+Otherwise, $\rho$ is not identifiable if the population process ("year effects") is modeled as independent parameters.
+
+With spatiotemporal modeling, the population process, i.e., spatial density, is predicted from a random walk across time steps in the spatiotemporal random field, where the expected state of the system in the current time step is the realized state in the previous time step. 
+This model structure is analogous to the linear regression in the simple example.
+Data from the old vessel provide information on the characteristics of the random walk process which maintains its state in the absence of new data.
+Departures from the predicted random walk across the vessel change are then ascribed by the model to the vessel effect.
+
+@huynh2023 demonstrated the approach for Subarea 0/1 (Offshore) GHL for the Paamiut time series and the 2019 survey on the FV Helga Maria.
+Initial results supported the field observation that the trawl on the Helga Maria did not catch small fish as efficiently as on Paamuit at deep depths, and the spatiotemporal model calculated the corresponding index accounting for the gear effect.
+
+This study provides a validation study to compare indices of abundance with calibration factors with stand-alone CF experiments with alternative indices that estimate the calibration factor in the standardization model (without CF data).
+Diagnostic procedures are proposed to identify whether the calibration approach without CF data is suitable when applied to real data.
+Finally, simulation testing is used to demonstrate the viability of the approach.
+
+# Methods
+
+We describe how spatiotemporal models can be fitted to survey data with calibration factors estimated from comparative fishing, or estimated in the absence of comparative fishing. 
+The method is applied to several case studies with diagnostic tests of model behaviour.
+Finally, simulation testing can support whether the approach and the accompanying diagnostic tests are appropriate.
+
+## Calibration from comparative fishing
+
+A "direct" calibration factor $\rho_\textrm{CF}$, the catchability ratio between the new and the old vessel, can be estimated from a comparative fishing experiment with a binomial model of the form:
+
+\begin{equation}
+\textrm{logit}(p_i) = \log(\rho_\textrm{CF}) + \log(E_{i,\textrm{new}}/E_{i,\textrm{old}}) (\#eq:cf)
+\end{equation}
+
+where $p_i$ is the proportion of total catch in joint set $i$ caught with the new vessel and $E_i$ is the effort, e.g., swept area for a trawl survey or number of deployed hooks in a longline survey. The calibration factor can be estimated in an intercept-only binomial GLM where the intercept is $\log(\rho_\textrm{CF})$ and the offset is the log ratio of fishing effort of the new and old vessels. 
+See @miller2013 for the derivation and further description.
+
+## Index standardization
+
+The proposed index standardization approach is of the form:
+
+\begin{equation}
+\log(y_i) = O_i + \sum_jX_{i,j}\beta_j + \omega'_i + \varepsilon'_i (\#eq:st)
+\end{equation}
+
+where $y_i$ the survey catch in set $i$, $O$ is an offset term, $\beta$ is a vector of fixed effects of length $j$, and $X$ is the design matrix, $\omega'_i$ is the spatial random effect at the spatial location of set $i$, $\varepsilon'_i$ is the spatiotemporal effect at the spatial location and time step of set $i$ generated from a random walk.
+
+The design matrix consists of covariates that predict either abundance or catchability, as well as an intercept term.
+To standardize catches, the effort covariate $E_i$, typically swept area for a trawl survey or number of deployed hooks in a hook and line survey, is included as an offset term (fixed effect is fixed to 1). 
+
+Spatial random effects $\omega_s$ are estimated as a Gaussian Markov random field (GMRF) from a pre-defined spatial grid at points $s$. Similarly, spatiotemporal random effects are estimated at points $s$ and time step $t$ with $\delta_{s,t}$ is a Gaussian Markov random field. 
+Spatial correlation in the GMRF is governed by a Matern covariance function with marginal standard deviation $\sigma$ and de-correlation parameter $\kappa$. The range parameter $r = \sqrt 8/\kappa$ denotes the distance at which GMRF values are effectively uncorrelated.
+
+The random walk generates the time-space value where $\varepsilon_{s,t} = \varepsilon_{s,t-1} + \delta_{s,t-1}$.
+Bilinear interpolation is then used to obtain the corresponding values for the spatial location of set $i$. 
+The prime notation denotes an interpolated value.
+
+If the survey has a direct calibration factor from comparative fishing, then the catch rates can be adjusted by $\rho_\textrm{CF}$ in the offset, with $O_i = \log(E_i/\rho_\textrm{CF})$ for fishing sets from the old vessel and $O_i = \log(E_i)$ otherwise.
+The natural log transformation is used in the offset to match the link function of the GLMM.
+
+If direct calibration factors are not available, then we propose to estimate an "indirect" calibration factor $\rho_\textrm{ST}$ as a fixed effect where the design matrix denotes sets from the old and new vessel. 
+Using the log link function in the standardization model, the fixed effect corresponds to $\log(\rho_\textrm{ST})$.
+
+In this study, we use the negative binomial probability distribution for maximum likelihood estimation, where the variance is a quadratic function of the mean. 
+After fitting the model, the index $I_t$ can be created by generating predictions of catch across grid cells corresponding to the spatial domain of the survey or stock for each year of the survey, applying the inverse of the link function, and summing the predictions across grid cells $g$:
+
+\begin{equation}
+I_t = \sum_g A_g \times \exp\left(\sum_jX_{g,j}\beta_j + \omega'_g + \varepsilon'_{g,t}\right) (\#eq:index)
+\end{equation}
+
+where $A_g$ is the area of grid cell $g$.
+The confidence interval for the index time series can be obtained from the delta method with bias-correction [@thorson2016]. 
+The index calculation is conditional on the error in the indirect calibration factor estimate.
+Thus, uncertainty in $\widehat{\log(\rho_\textrm{ST})}$, where ^ denotes an estimate, propogates into the confidence interval for years with the old vessel.
+Model fitting was performed in the sdmTMB R package [@anderson2024].
+
+## Case studies
+
+The validation exercise consists of standardizing indices from surveys with gear changes and corresponding CF experiments. 
+From two surveys, a total of six case studies were used. The Newfoundland and Labrador trawl survey (NL) used the vessel MV *Gadus Atlantica* operating with the Engel 145 otter trawl prior to 1995 and was replaced by the CCGS *Teleost* with the Campelen 1800 shrimp trawl. 
+Paired vessel tows in 1995 were used to estimate the gear efficiency between the Campelen and Engel [@warren1996].
+Further description of the survey and CF data is available in @cadigan2023 and @warren1996.
+Two species were used from this survey: Atlantic cod (*Gadus morhua*) and Greenland halibut in NAFO Divisions 2J3KL. 
+
+The Northeast Fisheries Science Center Spring survey (NE) samples groundfish stocks in New England and U.S. mid-Atlantic coastal waters. From 1968-2008, the RV *Albatross IV* with the Yankee 36 trawl executed the survey. 
+In 2009, the RV *Albatross IV* was replaced by the RV *Henry B. Bigelow* with a 4-seam, 3-bridle bottom trawl [@politis2014].
+A total of 636 paired comparative tows were performed in 2008 to estimate calibration factors [@miller2010; @miller2013].
+Four stocks were used from the NEFSC spring survey: Butterfish (*Peprilus triacanthus*) in New England and U.S. mid-Atlantic, Redfish (*Sebastes fasciatus*) in the Gulf of Maine, White hake (*Urophycis tenuis*) in the Gulf of Maine and Georges Bank, and Yellowtail flounder (*Limanda ferruginea*) in the Gulf of Maine and Georges Bank.
+
+These case studies span a range of characteristics in stock trend over time (declining, increasing, and stable), spatial distribution and patchiness (from the range parameter estimated in the spatiotemporal model), magnitude of the calibration factor (estimated from comparative fishing).
+
+For each case study, three indices were developed:
+
+1. Index with direct calibration. Calibration factors estimated from comparative fishing, $\rho_\textrm{CF}$, are used to adjust survey catches prior to fitting the spatiotemporal model, representing the ideal situation. For the Newfoundland survey, the direct calibration factors $\rho_\textrm{CF}$ were estimated from the binomial GLM of the form described in Equation \@ref(eq:cf).
+For the NEFSC spring survey, $\rho_\textrm{CF}$ were obtained from @miller2010.
+
+2. Index with indirect calibration. Calibration factors are estimated in the spatiotemporal model, $\rho_\textrm{ST}$, representing the proposed approach when comparative fishing is not available.
+3. Index with no calibration. No calibration factors are considered in the index standardization, reflecting a naive approach.
+
+Comparison of the direct and indirect indices illustrates the extent to which $\rho_\textrm{ST}$ agrees with $\rho_\textrm{CF}$, and provides a form of validation of the proposed indirect calibration method. 
+Assuming the index from direct calibration is the most representative, then comparison of the indirect and no calibration indices provides the marginal value of the indirect method, i.e., any discrepancy between the direct and indirect methods should not exceed that between the direct and no calibration methods. 
+
+## Diagnostic procedures
+
+The proposed indirect standardization approach will be used when $\rho_\textrm{CF}$ is not available, i.e., only the indirectly calibrated and uncalibrated indices are possible.
+Diagnostic tests are important to evaluate whether estimates of $\rho_\textrm{ST}$ are credible. 
+We propose and present several diagnostic tests for the above case studies:
+
+1. Are estimates of $\rho_\textrm{ST}$ significantly different from zero? If not, then the calibration is not needed as catchability is equal between vessels. A similar approach can be used with comparative fishing data to determine the need for calibration on a species by species level.
+
+2. Do estimates of $\rho_\textrm{ST}$ correctly fail to detect a significantly different vessel effect in the absence of a vessel change? The standardization method was applied in the case studies when the comparative fishing data indicated a significant vessel effect (true positive test). The method should also be applied to a subset of the data series from a single vessel with a dummy year change specified in the spatiotemporal model (true negative test). If the method is performing well, then estimates of $\rho_\textrm{ST}$ should not be significantly different from zero.
+
+3. Do estimates of $\rho_\textrm{ST}$ change over time as the new survey time series is built? The indirect calibration factor can theoretically be estimated in the spatiotemporal model after the first year of the new survey is complete. Unlike the direct calibration factor, which is estimated once from a single data set, the indirect calibration factor is re-estimated each time an additional year of data is available from the new survey. Thus, there exists the possibility of a retrospective pattern in $\rho_\textrm{ST}$, where the calibration factor undesirably changes from successive updates of the index. A well-behaved model should have little retrospective behaviour in the $\rho_\textrm{ST}$ estimate when the model is re-fitted with additional years of data following the vessel change.
+
+4. Are estimates of $\rho_\textrm{ST}$ dependent on the time gap between surveys? Surveys are ideally conducted annually but complications in logistics can frequently delay implementation of a new vessel for a longer period of time. The basis for estimating $\rho_\textrm{ST}$ is the change in the expected catch rates following the end of the data series for the old vessel. Thus, $\rho_\textrm{ST}$ estimates may significantly differ if the time gap increases. For both surveys in the case studies, there was no time gap for the vessel change. Sensitivity analyses that exclude data to delay the start of the new survey can evaluate the importance of the time gap.
+
+The true-negative diagnostic was applied to each case study by repeatedly fitting the spatiotemporal model to the new survey data (1995--2020 for the NL survey and 2009--2024 for the NE survey) with a dummy vessel change over six consecutive years (2005--2010 for the NL survey and 2015-2020 for the NE survey). 
+The retrospective analysis was applied from one to six years following the start of the new survey, with terminal year ranging from 1995--2000 for the NL survey and 2009--2014 for the NE survey). 
+The time gap analysis fitted the model to all survey data except for several initial years of the new survey (excluding 1995 up to 1995--1999 for the NL survey and 2009 up to 2009--2013 for the NE survey). 
+
+## Simulation study
+
+Simulation testing was utilized to determine the behaviour of the proposed standardization approach across a range of scenarios.
+Stock density was simulated spatially for ten years from constant GMRF, representing $\omega$ in equation \@ref(eq:st), and year-specific GMRF generated from a random walk, representing $\varepsilon$, in a 50 x 50 grid (Figure \@ref(fig:sim-grid)).
+In each year, 100 random sites were sampled, where the simulated observation was generated from sampling the negative binomial probability density function (pdf), where the mean density is the value predicted by equation \@ref(eq:st). 
+
+A total of 24 scenarios were developed from a factorial grid that varied four parameters of the operating model:
+
+1. Spatial density pattern: the operating model was generated with either a low or high de-correlation rate $\kappa =$ of 5 and 25, respectively, in the GMRF. A low de-correlation rate indicates that spatial stock density is highly correlated between adjacent cells (Figure \@ref(fig:sim-grid)). 
+
+2. Magnitude of vessel effect: samples were simulated with a vessel change starting in year 6, with three $\log(\rho) =$ 0, 0.2, or 1.
+
+3. Overdispersion: samples were simulated with either high or low overdispersion, with $\phi =$ 0.2 and 4, respectively, in the negative binomial pdf. The variance is a quadratic function of the mean $\mu$, with variance $\mu + \mu^2/\phi$.
+
+There was a single realization of the GMRF in the operating model for each scenario, with marginal standard deviation of 2 and 0.3 for the spatial and spatiotemporal GMRF, respectively. One hundred simulation replicates ($n=100$) were generated from stochastic samples returned by the probability density function. 
+The GMRF was generated from the `sim_ays_covar()` function in the SimSurvey R package [@regular2020] and the `rnegbin()` function from the MASS R package was used to generate simulated observations [@venables2002].
+For each simulation, the spatiotemporal model was then fitted in sdmTMB, either estimating the indirect calibration factor or estimating no calibration factor. 
+For each fit, the corresponding index was generated.
+
+Two performance metrics were calculated to evaluate performance. First, the error in $\log(\rho)$ was reported, where the error $\hat{X} - X$ is defined as the difference between the estimated value $\hat{X}$ and the true value $X$ of a model quantity.
+Second, the root mean square error (RMSE) in the index trend was calculated where $\textrm{RMSE} = \sqrt{\frac{1}{n}\sum_{i=1}^n(\hat{X_i} - X_i)^2}$.
+The index trend is defined as the slope in the regression of the log of the index over a period of most recent 5 years, and was used to compare indirectly calibrated and un-calibrated indices.
+
+A retrospective analysis was applied between 1-5 years of the new survey series to evaluate error trends following a vessel change.
+The models were also re-fitted with increasing the survey gap up from 1 to 4 years.
+The scenarios with $\rho = 0$ provide an opportunity to evaluate performance in the absence of a significant vessel effect.
+
+# Results
+
+## Comparison of indices
+
+The calibration factors from the spatiotemporal model were more imprecise for all case studies than estimates from comparative fishing, because the former were estimated without comparisons of the gear behavior in the field (Table \@ref(tab:rho)).
+Indices of abundance with indirect calibration factors frequently overlapped with those using direct calibration factors from comparative fishing (Figure \@ref(fig:index-compare)). 
+There was a strong agreement in the point estimate for $\rho_\textrm{CF}$ and $\rho_\textrm{ST}$ for NL Cod, which resulted in strong overlap in the index for the old vessel, albeit with slightly larger confidence intervals with the indirect method.
+The declining trend prior to the vessel change is clear for either calibration factor, and indirect calibration is preferred over no calibration.
+
+For the three other case studies (NE Butterfish, NE W. hake, and NE Y. flounder), the indirectly calibrated index is more uncertain for years with the old vessel, but the confidence intervals had substantial coverage and overlap with the directly calibrated index.
+For NE Butterfish, the $\rho_\textrm{ST}$ estimate had the reverse sign from $\rho_\textrm{CF}$. 
+Despite this result, the indirect calibrated index ultimately remains plausible because the trends in the index do not appreciably change with any of calibration methods through the break in the survey.
+For NE W. hake and NE Y. flounder, the indirect calibration factors were slightly larger than the direct ones (Table \@ref(tab:rho)). 
+Nonetheless, the indirectly calibrated index is the preferred over no calibration, when the two are compared to the directly calibrated index.
+
+For the remaining two case studies, there was substantially less overlap between the indirectly and directly calibrated index, with the larger indirect calibration factors.
+For NL G. halibut, the indirect index infers that the stock did not increase as rapidly through the break in the index; some of the difference in catchability is assigned to the population process instead in the indirect calibration.
+For NE redfish, the indirect index infers that the stock increased and then plateaued earlier than in the direct index.
+
+## Diagnostic procedures
+
+The indirect calibration factor $\rho_\textrm{ST}$ was significantly different from zero in all but one case study, i.e. NE Butterfish (Table \@ref(tab:rho)).
+This supports the general result that indirect calibration is preferable over no calibration.
+On the other hand, the direct calibration factor $\rho_\textrm{CF}$ for NE Butterfish was the smallest in our study.
+Ultimately, the indirect calibration did not substantially alter the index compared to other calibration choices.
+
+The true negative test correctly failed to detect a significant indirect calibration factor in the vast majority of cases (Figure \@ref(fig:rho-null)).
+Although there is generally high variability among $\rho_\textrm{ST}$ estimates, depending on the dummy year change, false positives were detected in only 3/36 cases, consistent with the predicted 5 percent false positive rate, using the hypothesis test with $\alpha = 0.05$ and 95 percent confidence intervals.
+
+The retrospective analysis, conditional on zero time gap with surveys, indicated that indirect calibration factors were consistently estimated and the magnitude did not change on the length of the survey time series (Figure \@ref(fig:rho-ret)). 
+The indirect calibration factors remain within range of the direct calibration factors for five of the six case studies, excluding NE Redfish.
+
+On the other hand, as the time gap between surveys increases, the indirect calibration factor is less consistently estimated (Figure \@ref(fig:rho-gap)). 
+The point estimates were less stable, for example, with the calibration factor decreasing in the case of NL G. halibut and NE Y. flounder with increasing time gap. 
+The standard error also tended to increase with increasing time gap, for example, almost as much as double when the time gap increases from 1 to 5 years for NE Y. flounder.
+
+## Simulation testing
+
+The estimates of $\rho_\textrm{ST}$ showed relatively little bias in the simulation study, as the median error was close to zero (Figure \@ref(fig:sim-rho)). 
+The range in the error of $\rho$ was smaller with lower overdispersion, decreased as more data from the new vessel became available, but increased as the time gap between surveys increased. 
+The trends in the error of $\rho$ did not substantially differ with various magnitude of $\rho$. 
+
+With indirect calibration, the RMSE in the index trend was generally lower with high spatial correlation ($\kappa = 5$) than with low correlation, and with low overdispersion compared with high (Figure \@ref(fig:sim-trend)).
+The RMSE was also lower with the indirect calibration than without calibration, as expected.
+These differences in RMSE increased as the calibration factor was larger, indicating that indirect calibration was preferable over no calibration.
+Trends in RMSE also did not vary with more data from the new vessel became available, and the time gap did not substantially alter performance.
+
+# Discussion
+
+While empirical data from comparative fishing is desirable for survey calibration rather than the proposed indirect calibration, the latter may be a valuable tool and an acceptable, practical alternative if the former is not possible.
+Comparison of the directly and indirectly calibrated indices of abundance indicates promising potential for the latter.
+In the best case scenario, estimates of the vessel effect for NL Cod were very similar despite estimation from different datasets.
+In the majority of cases, indirectly calibrated indices were preferred over uncalibrated indices.
+Overlap in the error bars of the directly and indirectly calibrated indices indicate a strong level of agreement in the interpretation of stock trends across the change in survey vessel.
+
+Indirect calibration also performed favorably with respect to the true negative test and the retrospective analysis.
+The retrospective analysis suggests that the model estimates the survey calibration factor primarily from the first year of the new data. It is possible to estimate the calibration factor once and use the same estimate for all subsequent updates of the index.
+While index standardization would lose the error propagation properties seen here from routine use of spatiotemporal modeling (utilizing a maximum likelihood approach), Bayesian approaches may incorporate priors on calibration factors, either indirect or direct, to incorporate uncertainty in $\rho$ in the index.
+
+Unfortunately, the time gap between surveys had the most notable impact on model results and will be an important consideration if there is a long time gap between surveys.
+Overall, statistical diagnostics provide an indicator on whether indices of abundance from indirect calibration are suitable.
+Long time gaps may generate high standard errors, which could generate large confidence intervals and obscure trends in the index across the vessel change due to the uncertainty in the estimate of the calibration factor.
+
+The simulation study generally supported the key findings from the case studies. With a large vessel effect, indirect calibration was preferred over no calibration, while indirect calibration did not worsen inferred trends in the index when there was a small or no vessel effect.
+
+We applied the spatiotemporal model and estimated vessel effects aggregated across all size classes. 
+Frequently, survey calibration is size-structured as catchability differences in fishing gears alters the size composition of fish caught [@miller2013].
+Indirect calibration by size class is possible by fitting separate spatiotemporal models for each size class [@huynh2023; @thorson2019comp; @perretti2019]. 
+However, computation time and numerical stability will limit the feasibility of fitting models at a fine resolution, e.g., 1 cm bins, as is done with direct calibration [@miller2013]. 
+Thus, it is generally more computationally convenient to aggregate and use as few size categories as necessary to estimate size-specific calibration factors.
+
+# Acknowledgements
+
+We thank Paul Regular (DFO) and Laura Wheeland (DFO) for providing the Newfoundland survey data and comments on an earlier draft of the manuscript. 
+We also thank Jakub Kircun (NEFSC) for providing the NEFSC Spring survey data.
+
+\newpage
+
+# Tables
+
+```{r rho, results="asis"}
+rho_CF <- readr::read_csv(here::here("tables/rho_CF.csv"), show_col_types = FALSE) %>%
+  mutate(rho_CF = paste0(round(log_rho, 2), " (", round(lower, 2), " - ", round(upper, 2), ")"),
+         CF_SE = signif(se, 3))
+rho_ST <- readr::read_csv(here::here("tables/rho_ST.csv"), show_col_types = FALSE) %>%
+  mutate(rho_ST = paste0(Estimate %>% round(2), " (", round(lower, 2), " - ", round(upper, 2), ")")) %>%
+  mutate(ST_SE = signif(`Std. Error`, 3))
+
+rho <- left_join(
+  rho_CF %>% select(Name, rho_CF, CF_SE),
+  rho_ST %>% select(Name, rho_ST, ST_SE),
+  by = "Name"
+) %>%
+  rename(`Case study` = Name)
+
+flextable(rho) %>%
+  #add_header(values = c("Stock", "$\\log(\\rho_\\textrm{CF})$", "$\\log(\\rho_\\textrm{ST})$")) %>%
+  align(j = 2:5, align = "right", part = "all") %>%
+  width(j = c(1, 2, 4), width = 1.5) %>%
+  set_caption(
+    caption = "Estimates of calibration factor, log(ρ), from the comparative fishing (CF, \"direct\") and the spatiotemporal model (ST, excluding CF sets, \"indirect\") with standard errors (SE). The 95 percent confidence interval is provided in parentheses."
+  )
+```
+
+\newpage
+
+# Figures
+
+```{r simple-example, out.width = "3.5in", fig.cap="Simple example illustrating the estimability of the indirect calibration factor in an index standardization model without comparative fishing. A predictive model for the population process is needed, a linear regression in this example, is needed to have the requisite degrees of freedom to estimate a vessel effect (at the dotted horizontal line) as a second intercept."}
+knitr::include_graphics(here::here("manuscript/figures/simple_example.png"))
+```
+
+```{r sim-grid, fig.cap="Simulated spatial density for a single year in the operating model, where the spatial correlation varies with the kappa parameter of the Matern covariance function. Grey circles indicate the location of 100 random sites for the simulated observations."}
+knitr::include_graphics(here::here("manuscript/figures/sampling.png"))
+```
+
+```{r index-compare, fig.cap="Comparison of indices of abundance for six case studies based on the vessel calibration method. The index is conditional on the catchability of the new vessel operating in years after the vertical dashed line. Thus, index values after the vessel change are identical regardless of the calibration method. The indirectly calibrated index has larger confidence intervals because the standard error from the calibration factor is carried over to the error in the index through the delta method."}
+knitr::include_graphics(here::here("manuscript/figures/index_compare_ci.png"))
+```
+
+```{r rho-null, out.width = "4in", fig.cap="Estimates (points and 95% confidence interval linerange) of the indirect calibration factor (y-axis) when fitting the spatiotemporal model to data from only the new survey and estimating a dummy calibration factor. The estimation is repeated for various dummy years (x-axis) for each case study (panels). The calibration factor should not be significantly different from zero (dotted horizontal line) with this false-negative test."}
+knitr::include_graphics(here::here("manuscript/figures/rho_null.png"))
+```
+
+```{r rho-ret, out.width = "4in", fig.cap="Estimates (points and 95% confidence interval linerange) of the indirect calibration factor (y-axis) when fitting the spatiotemporal model as more data from the new survey is available. The data set for the indirect calibration factor can increase as more survey data become available over time. In the retrospective analysis, the spatiotemporal model is fitted with all data from the old survey and from 1 to 6 years of the new survey (x-axis) for each case study (panels). Ideally, there is no trend in the indirect calibration factor over time. The horizontal dotted line is the direct calibration factor from comparative fishing and the shaded region is the corresponding 95 percent confidence interval."}
+knitr::include_graphics(here::here("manuscript/figures/rho_retrospective.png"))
+```
+
+```{r rho-gap, out.width = "4in", fig.cap="Estimates (points and 95% confidence interval linerange) of the indirect calibration factor (y-axis) when fitting the spatiotemporal model as the time gap between surveys increase (x-axis). The estimate may degrade as the time gap increases as the model must interpolate the population process across more time steps to estimate the calibration factor. The horizontal dotted line is the direct calibration factor from comparative fishing and the shaded region is the corresponding 95 percent confidence interval."}
+knitr::include_graphics(here::here("manuscript/figures/rho_gap.png"))
+```
+
+```{r sim-rho, out.width = "6in", fig.cap="Error in the indirect calibration factor (y-axis) in the simulation study. Points indicate the median and error bars indicate the 95 percent quantile across 100 simulations. Colours denote the spatial de-correlation parameter kappa in the Gaussian Markov Random Field, where high kappa denotes low spatial correlation. The circle shade indicate the overdispersion parameter in the operating model used to generate simulated observations. The top row shows the error as new survey data is fitted to the spatiotemporal model (1-5 years) across three different calibration factors (panels), while the bottom row shows the error as the time gap between surveys changes from 1-4 years."}
+knitr::include_graphics(here::here("manuscript/figures/sim_rho_error.png"))
+```
+
+
+(ref:fig-sim-trend) Root mean square error (RMSE) in the index trends (y-axis) in the simulation study. Circles denote the value from indirectly calibrated index while crosses denote the value from the uncalibrated index. For all other symbols and layout, see the caption of Figure \@ref(fig:sim-rho).
+
+```{r sim-trend, out.width = "6in", fig.cap="(ref:fig-sim-trend)"}
+knitr::include_graphics(here::here("manuscript/figures/sim_trend_RMSE.png"))
+```
+
+\newpage
+
+# References
+
+
+
+
