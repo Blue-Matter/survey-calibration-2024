@@ -35,19 +35,11 @@ dat_set <- readr::read_csv("validation_nefsc/NEFSC_spring_03282025.csv") %>%
          D = as.POSIXlt(EST_DATE_TIME, format = "%m/%d/%Y")) %>%
   mutate(year = lubridate::year(DT)) %>%
   mutate(year = ifelse(is.na(year), lubridate::year(D), year)) %>%
-  filter(SV_VESSEL != "DE", year >= 1983) %>%
+  #filter(SV_VESSEL != "DE", year >= 1983) %>%
   mutate(EFFORT = ifelse(is.na(AREA_SWEPT_WINGS_MEAN_KM2) & SV_VESSEL == "AL", 0.03995142, AREA_SWEPT_WINGS_MEAN_KM2)) %>%
   mutate(EFFORT = ifelse(is.na(AREA_SWEPT_WINGS_MEAN_KM2) & SV_VESSEL == "HB", 0.02393521, EFFORT)) %>%
   mutate(SV_VESSEL = factor(SV_VESSEL, levels = c("AL", "HB")))
-
-
-# Subset for GOM and GB
 dat_sf <- sf::st_as_sf(dat_set, coords = c("LON", "LAT"), crs = "NAD83")
-set_intersect <- sf::st_intersects(
-  area[1:2, ],
-  dat_sf
-) %>% unlist()
-
 
 # See Miller 2010 for calibration factors from comparative fishing
 #
@@ -68,45 +60,113 @@ comparative_rho_summary <- data.frame(
 )
 
 
-#sp <- c("redfish", "yt", "whitehake", "butterfish")
-#sp <- c("yt", "whitehake")
-sp <- "butterfish"
+#### Create initial spatial grid ----
+dat_utm <- sdmTMB::add_utm_columns(dat_set, ll_names = c("LON", "LAT"), ll_crs = 4326, utm_crs = 32619, units = "km")
+
+grid <- expand.grid(
+  X = seq(floor(min(dat_utm$X)), ceiling(max(dat_utm$X)), by = 10),
+  Y = seq(floor(min(dat_utm$Y)), ceiling(max(dat_utm$Y)), by = 10)
+) %>%
+  as.data.frame() %>%
+  mutate(SV_VESSEL = "HB", X_m = 1e3 * X, Y_m = 1e3 * Y, area_km2 = 100) %>%
+  add_utm_columns(ll_names = c("X_m", "Y_m"), ll_crs = 32619, utm_names = c("LON", "LAT"), utm_crs = 4326, units = "m")
+readr::write_csv(grid, "shapefiles/prediction_grid_nefsc.csv")
+
+#plot(grid$LON, grid$LAT)
+
+grid_sf <- sf::st_as_sf(grid, coords = c("LON", "LAT"), crs = "NAD83")
+
+
+# Loop over species
+sp <- c("redfish", "yt", "whitehake", "butterfish")
+
 
 for (s in sp) {
 
-  if (s == "redfish") {
-    dat <- dat_set[set_intersect, ] %>%
+  message("Fitting ", s)
+
+  if (s == "redfish") { # GOM only
+
+    set_intersect <- sf::st_intersects(
+      area[area$EPU == "GOM", ],
+      dat_sf
+    ) %>% unlist()
+
+    dat <- dat_utm[set_intersect, ] %>%
       mutate(CATCH = ifelse(is.na(SEBASTES_F_NUM), 0, SEBASTES_F_NUM)) %>%
       mutate(NPUE = CATCH/EFFORT) %>%
       mutate(calibration = ifelse(SV_VESSEL == "AL", 1.456, 1)) # Species 155, see survdat:::apply_conversion_factors
 
-  } else if (s == "yt") {
-    dat <- dat_set[set_intersect, ] %>%
+    grid_intersect <- sf::st_intersects(
+      area[area$EPU == "GOM", ],
+      grid_sf
+    ) %>% unlist()
+
+  } else if (s == "yt") { # GOM + GB
+
+    set_intersect <- sf::st_intersects(
+      area[area$EPU %in% c("GOM", "GB"), ],
+      dat_sf
+    ) %>% unlist()
+
+    dat <- dat_utm[set_intersect, ] %>%
       mutate(CATCH = ifelse(is.na(LIMANDA_F_NUM), 0, LIMANDA_F_NUM)) %>%
       mutate(NPUE = CATCH/EFFORT) %>%
       mutate(calibration = ifelse(SV_VESSEL == "AL", 2.347, 1)) # Species 105, see survdat:::apply_conversion_factors
+
+    grid_intersect <- sf::st_intersects(
+      area[area$EPU %in% c("GOM", "GB"), ],
+      grid_sf
+    ) %>% unlist()
 
   } else {
 
     catch_all <- readr::read_csv("validation_nefsc/Spring/22561_UNION_FSCS_SVCAT.csv") %>%
       select(CRUISE6, STRATUM, TOW, STATION, SVSPP, EXPCATCHNUM, SCIENTIFIC_NAME)
 
-    if (s == "whitehake") {
+    if (s == "whitehake") { # GOM
 
-      dat <- dat_set[set_intersect, ] %>%
+      set_intersect <- sf::st_intersects(
+        area[area$EPU %in% c("GOM", "GB"), ],
+        dat_sf
+      ) %>% unlist()
+
+      dat <- dat_utm[set_intersect, ] %>%
         left_join(catch_all %>% filter(SVSPP == '076')) %>%
         mutate(CATCH = ifelse(is.na(EXPCATCHNUM), 0, EXPCATCHNUM)) %>%
         mutate(NPUE = EXPCATCHNUM/EFFORT) %>%
         mutate(calibration = ifelse(SV_VESSEL == "AL", 2.235, 1)) # Species 076, see survdat:::apply_conversion_factors
-    } else if (s == "butterfish") {
 
-      dat <- dat_set[set_intersect, ] %>%
+      grid_intersect <- sf::st_intersects(
+        area[area$EPU %in% c("GOM", "GB"), ],
+        grid_sf
+      ) %>% unlist()
+
+      plot_shapefile(area) +
+        geom_point(data = dat %>% filter(NPUE> 0), aes(LON, LAT, colour = NPUE)) +
+        scale_colour_viridis_c()
+
+    } else if (s == "butterfish") { # Mid-Atlantic (All)
+
+      set_intersect <- sf::st_intersects(
+        st_make_valid(area),
+        dat_sf
+      ) %>% unlist()
+
+      dat <- dat_utm[set_intersect, ] %>%
         left_join(catch_all %>% filter(SVSPP == '131')) %>%
         mutate(CATCH = ifelse(is.na(EXPCATCHNUM), 0, EXPCATCHNUM)) %>%
         mutate(NPUE = EXPCATCHNUM/EFFORT) %>%
         mutate(calibration = ifelse(SV_VESSEL == "AL", 1.487, 1)) # Species 131, see survdat:::apply_conversion_factors
+
+      grid_intersect <- sf::st_intersects(
+        st_make_valid(area),
+        grid_sf
+      ) %>% unlist()
     }
   }
+
+  grid2 <- grid[grid_intersect, ]
 
   .ggsave <- function(filename, ...) {
     filename <- paste0("validation_nefsc/figures/", s, "_", filename)
@@ -123,35 +183,14 @@ for (s in sp) {
   #  theme(panel.spacing = unit(0, "in"))
   #.ggsave("npue_map.png", g, height = 12, width = 9)
 
-  #### Create spatial grid ----
-  dat_utm <- sdmTMB::add_utm_columns(dat, ll_names = c("LON", "LAT"), ll_crs = 4326, utm_crs = 32619, units = "km")
-
-  grid <- expand.grid(
-    X = seq(floor(min(dat_utm$X)), ceiling(max(dat_utm$X)), by = 10),
-    Y = seq(floor(min(dat_utm$Y)), ceiling(max(dat_utm$Y)), by = 10)
-  ) %>%
-    as.data.frame() %>%
-    mutate(SV_VESSEL = "HB", X_m = 1e3 * X, Y_m = 1e3 * Y, area_km2 = 100) %>%
-    add_utm_columns(ll_names = c("X_m", "Y_m"), ll_crs = 32619, utm_names = c("LON", "LAT"), utm_crs = 4326, units = "m")
-  #plot(grid$LON, grid$LAT)
-
-  grid_sf <- sf::st_as_sf(grid, coords = c("LON", "LAT"), crs = "NAD83")
-  grid_intersect <- sf::st_intersects(
-    area[1:2, ],
-    grid_sf
-  ) %>% unlist()
-
-  grid2 <- grid[grid_intersect, ]
-  #plot_shapefile(area[1:2, ]) +
-  #  geom_point(data = grid2, aes(LON, LAT))
-
-  #mesh <- make_mesh(dat_utm, c("X", "Y"), type = "cutoff", cutoff = 20)
+  #mesh <- make_mesh(dat, c("X", "Y"), type = "cutoff", cutoff = 20)
 
   ### Estimate calibration factor
+  message("Fitting model 1")
   fit <- fit_sdmTMB(
-    dat_utm,
+    dat,
     formula = CATCH ~ 1 + SV_VESSEL,
-    offset = log(dat_utm$EFFORT)
+    offset = log(dat$EFFORT)
   )
   saveRDS(fit, paste0("validation_nefsc/models/", s, "_fit_full.rds"))
   #fit <- readRDS(paste0("validation_nefsc/models/", s, "_fit_full.rds"))
@@ -161,10 +200,11 @@ for (s in sp) {
   #index <- readr::read_csv(paste0("validation_nefsc/index/", s, "_index.csv"))
 
   ### Provide calibration factor from CF
+  message("Fitting model 2")
   fit_rho <- fit_sdmTMB(
-    dat_utm,
+    dat,
     formula = CATCH ~ 1,
-    offset = log(dat_utm$EFFORT/dat_utm$calibration)
+    offset = log(dat$EFFORT/dat$calibration)
   )
   saveRDS(fit_rho, paste0("validation_nefsc/models/", s, "_fit_calibration.rds"))
   #fit_rho <- readRDS(paste0("validation_nefsc/models/", s, "_fit_calibration.rds"))
@@ -174,10 +214,11 @@ for (s in sp) {
   #index_rho <- readr::read_csv(paste0("validation_nefsc/index/", s, "_index_calibration.csv"))
 
   ### No calibration factor
+  message("Fitting model 3")
   fit_norho <- fit_sdmTMB(
-    dat_utm,
+    dat,
     formula = CATCH ~ 1,
-    offset = log(dat_utm$EFFORT)
+    offset = log(dat$EFFORT)
   )
   saveRDS(fit_norho, paste0("validation_nefsc/models/", s, "_fit_norho.rds"))
   #fit_norho <- readRDS(paste0("validation_nefsc/models/", s, "_fit_norho.rds"))
@@ -202,11 +243,12 @@ for (s in sp) {
     theme(legend.position = "bottom")
   .ggsave("index_no_comparative.png", g, height = 4, width = 6)
 
-  dat_utm <- dat_utm %>% rename(swept.area = EFFORT)
+  dat <- dat %>% rename(swept.area = EFFORT)
 
   #### Do retrospective ----
+  message("Doing retrospective")
   yret <- 2009:2014
-  fit_ret <- do_retrospective(yret, dat = dat_utm, sp = s,
+  fit_ret <- do_retrospective(yret, dat = dat, sp = s,
                               formula = CATCH ~ 1 + SV_VESSEL,
                               dir_name = "validation_nefsc")
   fit_ret <- lapply(yret, function(y) {
@@ -260,8 +302,9 @@ for (s in sp) {
 
 
   ### Fit with gap ----
+  message("Doing gap")
   year_new_vessel <- 2009
-  fit_gap <- do_retrospective_gap(gap = 1:5, dat = dat_utm, sp = s, year_new_vessel = year_new_vessel,
+  fit_gap <- do_retrospective_gap(gap = 1:5, dat = dat, sp = s, year_new_vessel = year_new_vessel,
                                   formula = CATCH ~ 1 + SV_VESSEL, #do_fit = FALSE,
                                   dir_name = "validation_nefsc")
   #fit_gap <- lapply(1:5, function(i) {
@@ -326,10 +369,11 @@ for (s in sp) {
   .ggsave("gap_vessel_effect.png", g, height = 3, width = 4)
 
   #### NULL test ----
+  message("Doing Null test")
   grid_null <- mutate(grid2, dummy = TRUE)
 
   ydummy <- c(2015:2020, NA)
-  dat_2009 <- dat_utm %>% filter(year >= 2009)
+  dat_2009 <- dat %>% filter(year >= 2009)
   fit_null <- do_null_test(ydummy, dat = dat_2009, sp = s,
                            formula = CATCH ~ 1,
                            formula_null = CATCH ~ 1 + dummy, #do_fit = FALSE,
