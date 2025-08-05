@@ -2,16 +2,24 @@
 library(tidyverse)
 theme_set(theme_bw())
 
-Names <- c("NL Cod", "NL G. halibut", "NE butterfish", "NE Redfish", "NE W. hake", "NE Y. flounder")
+Names <- c("NL Cod", "NL G. halibut", "NE Butterfish", "NE Redfish", "NE W. hake", "NE Y. flounder")
+
+# Rho from CF
 case_studies <- data.frame(
   code = c("cod", "ghl", "butterfish", "redfish", "whitehake", "yt"),
   Name = factor(Names, levels = Names),
   log_rho = c(2.072, 0.8913, log(c(1.487, 1.4564, 2.2354, 2.3619))),
+  se = c(0.08256, 0.0616, 0.1475, 0.08936, 0.07723, 0.07583),
   lower = c(2.072 - 1.96 * 0.08256, 0.8913 - 1.96 * 0.0616, log(c(1.1137, 1.2224, 1.9214, 2.0357))),
   upper = c(2.072 + 1.96 * 0.08256, 0.8913 + 1.96 * 0.0616, log(c(1.9862, 1.7351, 2.6008, 2.7403)))
 ) %>%
   mutate(dir = ifelse(grepl("NL", Name), "validation", "validation_nefsc"),
          year_new_vessel = ifelse(grepl("NL", Name), 1995, 2009))
+readr::write_csv(case_studies, "tables/rho_CF.csv")
+
+# SE
+#(log(c(1.487, 1.4564, 2.2354, 2.3619)) - log(c(1.1137, 1.2224, 1.9214, 2.0357)))/1.96
+#(log(c(1.487, 1.4564, 2.2354, 2.3619)) - log(c(1.9862, 1.7351, 2.6008, 2.7403)))/1.96
 
 log_rho_df <- lapply(1:nrow(case_studies), function(i) {
   rbind(
@@ -21,6 +29,49 @@ log_rho_df <- lapply(1:nrow(case_studies), function(i) {
     mutate(x = c(-Inf, Inf))
 }) %>%
   bind_rows()
+
+
+# Summary model objects, including rho_ST
+filename <- c("validation/models/cod_fit_full.rds", "validation/models/ghl_fit_full.rds",
+              "validation_nefsc/models/butterfish_fit_full.rds", "validation_nefsc/models/redfish_fit_full.rds",
+              "validation_nefsc/models/whitehake_fit_full.rds", "validation_nefsc/models/yt_fit_full.rds")
+
+mod <- lapply(filename, readRDS)
+
+#lapply(mod, sdmTMB::tidy)
+rho_ind <- c(4, 4, 2, 2, 2, 2)
+pars <- lapply(1:length(mod), function(i) {
+  j <- summary(mod[[i]]$sd_report, select = c("fixed", "report"))
+  p <- rownames(j)
+
+  df <- j %>%
+    as.data.frame() %>%
+    mutate(Name = Names[i], parameter = p)
+
+  log_rho <- filter(df, parameter == "b_j")[c(1, rho_ind[i]), ] %>%
+    mutate(parameter = c("Intercept", "log(rho)"))
+
+  rbind(
+    df %>% filter(parameter != "b_j"),
+    log_rho
+  )
+
+}) %>%
+  bind_rows() %>%
+  mutate(Name = factor(Name, Names)) %>%
+  filter(parameter %in% c("sigma_O", "sigma_E", "range", "phi", "Intercept", "log(rho)")) %>%
+  summarise(Estimate = mean(Estimate), `Std. Error` = mean(`Std. Error`), .by = c(Name, parameter)) %>%
+  mutate(lower = Estimate - 1.96 * `Std. Error`, upper = Estimate + 1.96 * `Std. Error`)
+
+# Write table of rho_ST
+pars %>% filter(parameter == "log(rho)") %>%
+  readr::write_csv("tables/rho_ST.csv")
+
+# Write table of parameters (range, phi, sigma_E, sigma_O, etc.)
+pars %>%
+  mutate(Estimate = round(Estimate, 2)) %>%
+  reshape2::dcast(list("parameter", "Name"), value.var = "Estimate") %>%
+  readr::write_csv("tables/ST_par.csv")
 
 # Compare indices (with and without calibration)
 index <- lapply(1:nrow(case_studies), function(i) {
@@ -44,19 +95,36 @@ index <- lapply(1:nrow(case_studies), function(i) {
   bind_rows() %>%
   mutate(Name = factor(Name, levels = Names))
 
+lab <- expression("(1) Direct"~rho[CF], "(2) Indirect"~rho[ST], "(3) None")
+
 g <- index %>%
   #mutate(est = est, .by = Name) %>%
-  ggplot(aes(year, log(est), linetype = Model, shape = Model)) +
+  ggplot(aes(year, log(est), linetype = Model)) +
   #geom_point() +
   geom_line() +
   geom_vline(data = case_studies, aes(xintercept = year_new_vessel - 0.5), linetype = 2) +
-  labs(x = "Year", y = "log(Index)") +
+  labs(x = "Year", y = "log(Index)", linetype = "Calibration") +
   facet_wrap(vars(Name), scales = "free", ncol = 2) +
   #expand_limits(y = 0) +
   scale_shape_manual(values = c(16, 1, 4)) +
-  scale_linetype_manual(values = c(1, 2, 3)) +
+  scale_linetype_manual(values = c(1, 2, 3), labels = lab) +
   theme(legend.position = "bottom", strip.background = element_blank())
-ggsave("manuscript/figures/index_compare.png", g, height = 7, width = 6)
+ggsave("manuscript/figures/index_compare.png", g, height = 6, width = 6)
+
+g <- index %>%
+  #mutate(est = est, .by = Name) %>%
+  ggplot(aes(year, log(est), ymin = log(lwr), ymax = log(upr), shape = Model, colour = Model)) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  geom_line(linewidth = 0.25, linetype = 3) +
+  geom_linerange(position = position_dodge(width = 0.5), linewidth = 0.25) +
+  geom_vline(data = case_studies, aes(xintercept = year_new_vessel - 0.5), linetype = 2) +
+  labs(x = "Year", y = "log(Index)", colour = "Calibration", shape = "Calibration") +
+  facet_wrap(vars(Name), scales = "free", ncol = 2) +
+  #expand_limits(y = 0) +
+  scale_colour_discrete(labels = lab) +
+  scale_shape_manual(values = c(16, 1, 4), labels = lab) +
+  theme(legend.position = "bottom", strip.background = element_blank(), panel.grid.minor = element_blank())
+ggsave("manuscript/figures/index_compare_ci.png", g, height = 6, width = 6)
 
 
 # Retrospective
@@ -71,8 +139,9 @@ index_ret <- lapply(1:nrow(case_studies), function(i) {
   mutate(Name = factor(Name, levels = Names))
 
 g <- index_ret %>%
+  select(!se) %>%
   left_join(case_studies) %>%
-  mutate(npeel = year_ret - year_new_vessel) %>%
+  mutate(npeel = year_ret - year_new_vessel + 1) %>%
   #mutate(est = est/mean(est), .by = Name) %>%
   ggplot(aes(year, log(est), colour = factor(npeel))) +
   #geom_point() +
@@ -82,7 +151,7 @@ g <- index_ret %>%
   facet_wrap(vars(Name), scales = "free", ncol = 2) +
   labs(x = "Year", y = "log(Index)", colour = "Elapsed years") +
   theme(legend.position = "bottom", strip.background = element_blank())
-ggsave("manuscript/figures/index_retrospective.png", g, height = 7, width = 6)
+ggsave("manuscript/figures/index_retrospective.png", g, height = 6, width = 5)
 
 
 # Retrospective (gear effect)
@@ -118,8 +187,8 @@ vessel_effect_ret <- sfLapply(1:nrow(case_studies), function(i) {
 
 g <- vessel_effect_ret %>%
   left_join(case_studies) %>%
-  mutate(npeel = year_ret - year_new_vessel) %>%
-  ggplot(aes(npeel, Estimate)) +
+  mutate(npeel = year_ret - year_new_vessel + 1) %>%
+  ggplot(aes(factor(npeel), Estimate)) +
   geom_ribbon(data = log_rho_df, fill = "grey80", aes(x, ymin = lower, ymax = upper), inherit.aes = FALSE) +
   #geom_hline(aes(yintercept = lower), linetype = 3) +
   #geom_hline(aes(yintercept = upper), linetype = 3) +
@@ -128,9 +197,9 @@ g <- vessel_effect_ret %>%
   geom_linerange(aes(ymin = lwr, max = upr)) +
   #expand_limits(y = 0) +
   facet_wrap(vars(Name), ncol = 2, scales = "free") +
-  labs(x = "Elapsed years", y = expression(log(rho))) +
+  labs(x = "Elapsed years", y = expression(widehat(log(rho)))) +
   theme(strip.background = element_blank())
-ggsave("manuscript/figures/rho_retrospective.png", g, height = 5, width = 4)
+ggsave("manuscript/figures/rho_retrospective.png", g, height = 4, width = 4)
 
 
 # Gap (index)
@@ -143,6 +212,7 @@ index_gap <- lapply(1:nrow(case_studies), function(i) {
   bind_rows()
 
 g <- index_gap %>%
+  select(!se) %>%
   left_join(case_studies) %>%
   ggplot(aes(year, log(est))) +
   geom_point(data = dplyr::filter(index_gap, impute), shape = 1, aes(colour = factor(gap))) +
@@ -151,12 +221,12 @@ g <- index_gap %>%
   geom_line(data = dplyr::filter(index_gap, year > year[max(which(.data$impute))], .by = c(gap, Name)), aes(colour = factor(gap))) +
   #expand_limits(y = 0) +
   facet_wrap(vars(Name), ncol = 2, scales = "free") +
-  #geom_vline(aes(xintercept = year_new_vessel - 0.5), linetype = 2) +
+  geom_vline(aes(xintercept = year_new_vessel - 0.5), linetype = 2) +
   #scale_shape_manual(values = c("TRUE" = 1, "FALSE" = 16)) +
   guides(shape = "none") +
   labs(x = "Year", y = "log(Index)", colour = "Time gap") +
   theme(legend.position = "bottom", strip.background = element_blank())
-ggsave("manuscript/figures/index_gap.png", g, height = 7, width = 6)
+ggsave("manuscript/figures/index_gap.png", g, height = 6, width = 5)
 
 # Gap (gear effect)
 library(snowfall)
@@ -195,9 +265,9 @@ g <- vessel_effect_gap %>%
   geom_point() +
   facet_wrap(vars(Name), ncol = 2, scales = "free") +
   geom_linerange(aes(ymin = lwr, max = upr)) +
-  labs(x = "Time gap", y = expression(log(rho))) +
+  labs(x = "Time gap between surveys (years)", y = expression(widehat(log(rho)))) +
   theme(strip.background = element_blank())
-ggsave("manuscript/figures/rho_gap.png", g, height = 5, width = 4)
+ggsave("manuscript/figures/rho_gap.png", g, height = 4, width = 4)
 
 
 # Null test (index)
@@ -268,8 +338,181 @@ g <- vessel_effect_null %>%
   geom_point() +
   facet_wrap(vars(Name), ncol = 2, scales = "free") +
   geom_linerange(aes(ymin = lwr, max = upr)) +
-  labs(x = "Dummy year change", y = expression(log(rho))) +
-  theme(strip.background = element_blank())
-ggsave("manuscript/figures/rho_null.png", g, height = 5, width = 4)
+  labs(x = "Dummy year change", y = expression(widehat(log(rho)))) +
+  theme(strip.background = element_blank(), axis.text.x = element_text(angle = 90, vjust = 0.5))
+ggsave("manuscript/figures/rho_null.png", g, height = 4.5, width = 3.5)
 
 sfStop()
+
+
+
+
+
+
+
+
+
+# Summary model objects
+filename <- c("validation/models/cod_fit_full.rds", "validation/models/ghl_fit_full.rds",
+              "validation_nefsc/models/butterfish_fit_full.rds", "validation_nefsc/models/redfish_fit_full.rds",
+              "validation_nefsc/models/whitehake_fit_full.rds", "validation_nefsc/models/yt_fit_full.rds")
+
+mod <- lapply(filename, readRDS)
+
+lapply(mod, sdmTMB::tidy)
+rho_ind <- c(4, 4, 2, 2, 2, 2)
+pars <- lapply(1:length(mod), function(i) {
+  j <- summary(mod[[i]]$sd_report, select = c("fixed", "report"))
+  p <- rownames(j)
+
+  df <- j %>%
+    as.data.frame() %>%
+    mutate(Name = Names[i], parameter = p)
+
+  log_rho <- filter(df, parameter == "b_j")[c(1, rho_ind[i]), ] %>%
+    mutate(parameter = c("Intercept", "log(rho)"))
+
+  rbind(
+    df %>% filter(parameter != "b_j"),
+    log_rho
+  )
+
+}) %>%
+  bind_rows() %>%
+  mutate(Name = factor(Name, Names)) %>%
+  filter(parameter %in% c("sigma_O", "sigma_E", "range", "phi", "Intercept", "log(rho)")) %>%
+  summarise(Estimate = mean(Estimate), `Std. Error` = mean(`Std. Error`), .by = c(Name, parameter)) %>%
+  #mutate(label = paste0(signif(Estimate, 3), " (", signif(`Std. Error`, 3), ")"))
+  mutate(label = ifelse(parameter %in% c("Intercept", "log(rho)"),
+                        paste0(signif(Estimate, 3), " (", signif(`Std. Error`, 3), ")"),
+                        signif(Estimate, 3)))
+
+pars %>%
+  reshape2::dcast(list("parameter", "Name"), value.var = "label")
+
+pars %>%
+  reshape2::dcast(list("parameter", "Name"), value.var = "Estimate")
+
+# Compare spatial grid
+pred_grid <- lapply(1:length(mod), function(i) {
+
+  require(sf)
+
+  if (i < 3) {
+    dat_fit <- mod[[i]]$data
+    grid2 <- readr::read_csv("shapefiles/prediction_grid.csv") %>%
+      rename(X_m = X, Y_m = Y) %>%
+      mutate(X = 1e-3 * X_m, Y = 1e-3 * Y_m,
+             depth = -1 * depth) %>%
+      filter(.data$depth > 0) %>%
+      filter(.data$div %in% unique(dat_fit$NAFOdiv)) %>%
+      mutate(log_depth = log(depth),
+             data.series = "Campelen")
+  } else {
+    grid <- readr::read_csv("shapefiles/prediction_grid_nefsc.csv")
+
+    area <- sf::st_read(dsn = system.file("extdata", "EPU.shp", package = "survdat"), quiet = TRUE)
+
+    grid_sf <- sf::st_as_sf(grid, coords = c("LON", "LAT"), crs = "NAD83")
+
+    if (i == 3) { # Butterfish
+
+      grid_intersect <- sf::st_intersects(
+        st_make_valid(area),
+        grid_sf
+      ) %>% unlist()
+
+    } else if (i == 4) { # Redfish
+
+      grid_intersect <- sf::st_intersects(
+        area[area$EPU == "GOM", ],
+        grid_sf
+      ) %>% unlist()
+
+    } else {
+
+      grid_intersect <- sf::st_intersects(
+        area[area$EPU %in% c("GOM", "GB"), ],
+        grid_sf
+      ) %>% unlist()
+
+    }
+
+    grid2 <- grid[grid_intersect, ]
+
+  }
+
+  pred <- predict(mod[[i]], newdata = grid2 %>% mutate(year = max(mod[[i]]$data$year))) %>%
+    mutate(Name = Names[i])
+
+}) %>%
+  bind_rows()
+
+g <- pred_grid %>%
+  mutate(Name = factor(Name, Names)) %>%
+  #mutate(value = omega_s) %>%
+  mutate(value = pmin(omega_s, 5)) %>%
+  ggplot(aes(X, Y, fill = value)) +
+  geom_tile(height = 10, width = 10) +
+  facet_wrap(vars(Name), scales = "free") +
+  scale_fill_gradient2(high = scales::muted("red"), low = scales::muted("blue"), mid = 0)
+
+max_value <- 3
+#map_range <- lapply(1:length(Names), function(i) {
+#
+#  val <- pred_grid %>%
+#    summarise(xmin = min(X_m), xmax = max(X_m), ymin = min(Y_m), ymax = max(Y_m), .by = Name) %>%
+#    filter(Name == Names[i])
+#
+#  crs <- ifelse(grepl("NE", Names[i]), 32619, 32622)
+#
+#  coast <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+#    st_transform(crs = crs) #%>%
+#    #sf::st_crop(xmin = val$xmin, xmax = val$xmax, ymin = val$ymin, ymax = val$ymax)
+#
+#  return(coast)
+#
+#})
+#
+#gg <- lapply(1:length(Names), function(i) {
+#  crs <- ifelse(grepl("NE", Names[i]), 32619, 32622)
+#
+#  df <- pred_grid %>%
+#    mutate(Name = factor(Name, Names)) %>%
+#    mutate(value = (est - mean(est))/sd(est), .by = c(Name)) %>%
+#    mutate(value = pmin(value, max_value) %>% pmax(-max_value, value)) %>%
+#    filter(Name == Names[i])
+#
+#  coast <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf")
+#
+#  g <- df %>%
+#    ggplot() +
+#    geom_sf(data = coast) +
+#    coord_sf(expand = FALSE, crs = crs, xlim = range(df$X_m), ylim = range(df$Y_m)) +
+#    geom_tile(aes(X_m, Y_m, fill = value), height = 10000, width = 10000) +
+#    facet_wrap(vars(Name)) +
+#    scale_fill_gradient2(high = scales::muted("red"), low = scales::muted("blue"), mid = 0, limits = c(-1, 1) * max_value)
+#  g
+#})
+#g <- ggpubr::ggarrange(plotlist = g, ncol = 2, nrow = 3)
+#ggsave("manuscript/figures/density_casestudies.png", g, height = 10, width = 10)
+
+
+
+max_value <- 2
+g <- pred_grid %>%
+  mutate(Name = factor(Name, Names)) %>%
+  mutate(value = (est - mean(est))/sd(est), .by = c(Name)) %>%
+  mutate(value = pmin(value, max_value) %>% pmax(-max_value)) %>%
+  ggplot(aes(X, Y, fill = value)) +
+  geom_tile(height = 10, width = 10) +
+  facet_wrap(vars(Name), scales = "free") +
+  scale_fill_gradient2(high = scales::muted("red"), low = scales::muted("blue"), mid = 0, limits = c(-1, 1) * max_value) +
+  theme(panel.grid = element_blank(), legend.position = "bottom") +
+  labs(fill = "Relative density")
+ggsave("manuscript/figures/density_casestudies.png", g, height = 4, width = 6)
+
+#tmap package tm_shape(FRA_sf) +
+#tm_borders() +
+#  tm_facets(by = "NAME_1")
+

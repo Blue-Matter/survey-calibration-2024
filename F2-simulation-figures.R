@@ -179,7 +179,7 @@ g <- rho_ret_stat %>%
   coord_cartesian(ylim = c(0, 0.6)) +
   scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
   labs(x = "Years after vessel change",
-       y = "RMSE",
+       y = expression("RMSE"~~log(rho)),
        colour = expression(kappa),
        shape = expression(phi)) +
   theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
@@ -567,7 +567,7 @@ samp <- lapply(c(1:2, 7:8), function(i) {
     cbind(sim_design[i, ])
 }) %>%
   bind_rows() %>%
-  mutate(design = ifelse(!cluster, "Cluster", "Random"), kappa = paste("kappa = ", kappa))
+  mutate(design = ifelse(cluster, "Cluster", "Random"), kappa = paste0("kappa==", kappa))
 
 pop <- lapply(c(1:2, 7:8), function(i) {
   nd_y[[i]] %>%
@@ -575,21 +575,25 @@ pop <- lapply(c(1:2, 7:8), function(i) {
     cbind(sim_design[i, ])
 }) %>%
   bind_rows() %>%
-  mutate(design = ifelse(!cluster, "Cluster", "Random"), kappa = paste("kappa = ", kappa))
+  mutate(design = ifelse(cluster, "Cluster", "Random"), kappa = paste0("kappa==", kappa))
 
 
-g <- ggplot(pop, aes(X, Y)) +
+g <- pop %>%
+  filter(design == "Random") %>%
+  ggplot(aes(X, Y)) +
   geom_tile(aes(fill = log_pred_pop)) +
-  geom_point(data = samp, shape = 21, fill = "grey80") +
-  facet_grid(vars(kappa), vars(design)) +
+  geom_point(data = samp %>% filter(design == "Random"), shape = 21, fill = "grey80") +
+  facet_wrap(vars(kappa), labeller = label_parsed) +
+  #facet_grid(vars(kappa), vars(design)) +
   coord_cartesian(expand = FALSE) +
   scale_fill_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
-  labs(fill = "log Density") +
+  labs(fill = "log(Density)") +
   theme(strip.background = element_blank())
-ggsave("simulation/figures/sampling.png", g, height = 4, width = 6)
+ggsave("manuscript/figures/sampling.png", g, height = 2.5, width = 6)
 
 
 # Summary error figures
+# Rho error & bias
 g1 <- rho_ret %>%
   filter(!cluster) %>%
   summarise(median = median(Error),
@@ -637,8 +641,98 @@ g2 <- rho_gap %>%
 g <- ggpubr::ggarrange(g1, g2, ncol = 1, common.legend = TRUE, legend = "bottom")
 ggsave("manuscript/figures/sim_rho_error.png", g, height = 5, width = 6)
 
+# Rho RMSE
+g1 <- rho_ret %>%
+  filter(!cluster) %>%
+  summarise(RMSE = sqrt(mean(Error^2)),
+            .by = c(y, log_rho, cluster, OM, kappa, phi)) %>%
+  mutate(row = paste0("log(rho)==", log_rho)) %>%
+  mutate(column = ifelse(!cluster, "Random", "Cluster")) %>%
+  ggplot(aes(y, RMSE, colour = factor(kappa))) +
+  #geom_hline(yintercept = 0, linetype = 3) +
+  geom_pointrange(fatten = 3.5, #shape = 1,
+                 position = position_dodge(0.6),
+                 aes(y = RMSE, ymin = 0, ymax = RMSE, group = OM, shape = factor(phi))) +
+  facet_wrap(vars(row), labeller = "label_parsed") +
+  #coord_cartesian(ylim = c(-1.1, 1.1)) +
+  scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
+  labs(x = "Years after vessel change",
+       y = expression("RMSE"~~widehat(log(rho))),
+       colour = expression(kappa),
+       shape = expression(phi)) +
+  theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
 
+g2 <- rho_gap %>%
+  filter(!cluster) %>%
+  summarise(RMSE = sqrt(mean(Error^2)),
+            .by = c(ngap, log_rho, cluster, OM, kappa, phi)) %>%
+  mutate(row = paste0("log(rho)==", log_rho)) %>%
+  mutate(column = ifelse(!cluster, "Random", "Cluster")) %>%
+  ggplot(aes(ngap, Error, colour = factor(kappa))) +
+  geom_pointrange(fatten = 3.5, #shape = 1,
+                  position = position_dodge(0.6),
+                  aes(y = RMSE, ymin = 0, ymax = RMSE, group = OM, shape = factor(phi))) +
+  facet_wrap(vars(row), labeller = "label_parsed") +
+  #coord_cartesian(ylim = c(-1.1, 1.1)) +
+  scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
+  labs(x = "Time gap between surveys",
+       y = expression("RMSE"~~widehat(log(rho))),
+       colour = expression(kappa),
+       shape = expression(phi)) +
+  theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
 
+g <- ggpubr::ggarrange(g1, g2, ncol = 1, common.legend = TRUE, legend = "bottom")
+ggsave("manuscript/figures/sim_rho_RMSE.png", g, height = 5, width = 6)
+
+# Index trend error
+g1 <- trend_ret %>%
+  filter(!cluster) %>%
+  summarise(median = median(Error),
+            lower = quantile(Error, 0.025),
+            upper = quantile(Error, 0.975),
+            .by = c(y, log_rho, cluster, OM, kappa, phi)) %>%
+  mutate(row = paste0("log(rho)==", log_rho)) %>%
+  mutate(column = ifelse(!cluster, "Random", "Cluster")) %>%
+  ggplot(aes(y, Error, colour = factor(kappa))) +
+  geom_hline(yintercept = 0, linetype = 3) +
+  geom_pointrange(fatten = 3.5, #shape = 1,
+                  position = position_dodge(0.6),
+                  aes(y = median, ymin = lower, ymax = upper, group = OM, shape = factor(phi))) +
+  facet_wrap(vars(row), labeller = "label_parsed") +
+  coord_cartesian(ylim = c(-0.4, 0.4)) +
+  scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
+  labs(x = "Years after vessel change",
+       y = "Error in trend",
+       colour = expression(kappa),
+       shape = expression(phi)) +
+  theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
+
+g2 <- trend_gap %>%
+  filter(!cluster) %>%
+  summarise(median = median(Error),
+            lower = quantile(Error, 0.025),
+            upper = quantile(Error, 0.975),
+            .by = c(ngap, log_rho, cluster, OM, kappa, phi)) %>%
+  mutate(row = paste0("log(rho)==", log_rho)) %>%
+  mutate(column = ifelse(!cluster, "Random", "Cluster")) %>%
+  ggplot(aes(ngap, Error, colour = factor(kappa))) +
+  geom_hline(yintercept = 0, linetype = 3) +
+  geom_pointrange(fatten = 3.5, #shape = 1,
+                  position = position_dodge(0.6),
+                  aes(y = median, ymin = lower, ymax = upper, group = OM, shape = factor(phi))) +
+  facet_wrap(vars(row), labeller = "label_parsed") +
+  coord_cartesian(ylim = c(-0.4, 0.4)) +
+  scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
+  labs(x = "Time gap between surveys",
+       y = "Error in trend",
+       colour = expression(kappa),
+       shape = expression(phi)) +
+  theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
+
+g <- ggpubr::ggarrange(g1, g2, ncol = 1, common.legend = TRUE, legend = "bottom")
+ggsave("manuscript/figures/sim_trend_error.png", g, height = 5, width = 6)
+
+# Index trend RMSE
 g1 <- trend_ret_stat %>%
   filter(est_rho, !cluster) %>%
   ggplot(aes(y, RMSE, colour = factor(kappa), ymin = 0, ymax = RMSE, group = OM)) +
@@ -648,7 +742,7 @@ g1 <- trend_ret_stat %>%
   coord_cartesian(ylim = c(0, 0.2)) +
   scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
   labs(x = "Years after vessel change",
-       y = "RMSE of trend",
+       y = "RMSE in trend",
        colour = expression(kappa),
        shape = expression(phi)) +
   theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank()) +
