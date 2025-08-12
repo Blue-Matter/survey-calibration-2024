@@ -6,19 +6,19 @@ sfInit(parallel = TRUE, cpus = 10)
 
 # Simulation design ----
 sim_design <- expand.grid(
-  sigma_O = 2,
+  sigma_O = 0.5,
   sigma_E = 0.3,
-  kappa = c(5, 25), # Low kappa = high range = low correlation at short distances
+  kappa = c(25, 50), # Low kappa = high range = low correlation at short distances
   nyears = 10,
   log_rho = c(0, 0.2, 1),
   st = "rw",
   drift = 0,
-  cluster = c(FALSE, TRUE),
+  cluster = FALSE,
   phi = c(0.2, 4)
 ) %>%
   mutate(range = sqrt(8)/kappa,
          OM = paste("OM", 1:nrow(.)))
-#readr::write_csv(sim_design, "simulation/sim_design.csv")
+readr::write_csv(sim_design, "simulation/sim_design.csv")
 
 source("99-functions-simulation.R")
 
@@ -32,15 +32,15 @@ for (i in 1:nrow(sim_design)) {
 
   message("OM ", i)
   nsim <- 100
-  om <- dplyr::select(nd_y[[i]], X, Y, year, pred, cell)
+  om <- dplyr::select(nd_y[[i]], X, Y, year, mu, cell)
 
   # Simulate data ----
-  #sfExport(list = c("simulate_data", "sim_design", "i", "om"))
-  #sfClusterSetupRNGstream(seed = 1)
-  #dat_list <- sfLapply(1:nsim, function(...) {
-  #  simulate_data(om, phi = sim_design$phi[i], nyears = sim_design$nyears[i], cluster = sim_design$cluster[i])
-  #})
-  #saveRDS(dat_list, paste0("simulation/dat_list_", i, ".rds"))
+  sfExport(list = c("simulate_data", "sim_design", "i", "om"))
+  sfClusterSetupRNGstream(seed = 1)
+  dat_list <- sfLapply(1:nsim, function(...) {
+    simulate_data(om, phi = sim_design$phi[i], cluster = sim_design$cluster[i])
+  })
+  saveRDS(dat_list, paste0("simulation/dat_list_", i, ".rds"))
   dat_list <- readRDS(paste0("simulation/dat_list_", i, ".rds"))
 
   # Run retrospective ----

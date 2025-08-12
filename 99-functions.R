@@ -159,7 +159,7 @@ make_design_index <- function(dat, simsurvey = FALSE) {
 
 fit_sdmTMB <- function(dat, formula = number ~ poly(log_depth, 2, raw = TRUE) + data.series,
                        offset = log(dat$swept.area), family = nbinom2(),
-                       spatiotemporal = "rw",
+                       spatiotemporal = "rw", anisotropy = TRUE,
                        ...) {
 
   require(sdmTMB)
@@ -184,7 +184,7 @@ fit_sdmTMB <- function(dat, formula = number ~ poly(log_depth, 2, raw = TRUE) + 
     extra_time = extra_time,
     spatiotemporal = spatiotemporal,
     offset = offset,
-    anisotropy = TRUE,
+    anisotropy = anisotropy,
     ...
   )
 

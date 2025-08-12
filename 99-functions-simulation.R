@@ -4,7 +4,7 @@ sim_OM <- function(i, sim_design, seed = 10392,
                    cell_width = 0.02) {
   set.seed(seed)
   require(tidyverse)
-  require(SimSurvey)
+  require(sdmTMB)
 
   sigma_O <- sim_design$sigma_O[i]
   sigma_E <- sim_design$sigma_E[i]
@@ -13,73 +13,67 @@ sim_OM <- function(i, sim_design, seed = 10392,
   log_rho <- sim_design$log_rho[i]
   st <- match.arg(as.character(sim_design$st[i]), choices = c("rw", "iid"))
   drift <- sim_design$drift[i]
+  stopifnot(drift == 0) # for (y in 2:nyears) epsilon_st[, y, ] <- drift + epsilon_st[, y-1, ] + delta_st[, y, ]
+  phi <- sim_design$phi[i]
 
   # Operating model ----
   nd <- expand.grid(X = seq(0, 1, cell_width), Y = seq(0, 1, cell_width)) %>%
     mutate(cell = 1:nrow(.))
 
-  omega_matern_fn <- SimSurvey::sim_ays_covar(
-    sd = sigma_O,
-    lambda = 1, # nu
+  nd2 <- lapply(1:nyears, function(y) {
+    mutate(nd, year = y)
+  }) %>%
+    bind_rows() %>%
+    mutate(log_rho = ifelse(year > y_new_vessel, .env$log_rho, 0))
+
+  #mesh <- sdmTMB::make_mesh(nd2, xy_cols = c("X", "Y"), n_knots = 100)
+  mesh <- sdmTMB::make_mesh(nd2, xy_cols = c("X", "Y"), type = "cutoff", cutoff = 0.04)
+
+  nd_y <- sdmTMB_simulate(
+    ~ 0 + log_rho + cell,
+    data = nd2,
+    mesh = mesh,
+    family = nbinom2(),
+    time = "year",
     range = range,
-    phi_age = 0,
-    phi_year = 0
-  )
-  epsilon_matern_fn <- SimSurvey::sim_ays_covar(
-    sd = sigma_E,
-    lambda = 1, # nu
-    range = range,
-    phi_age = 0,
-    phi_year = 0
-  )
-
-  omega_s <- omega_matern_fn(nd[, c("X", "Y")], ages = 1, years = 1, cell = seq(1, nrow(nd)))
-  delta_st <- epsilon_matern_fn(nd[, c("X", "Y")], ages = 1, years = seq(1, nyears), cell = seq(1, nrow(nd)))
-
-  if (st == "rw") {
-    epsilon_st <- array(NA, dim(delta_st), dimnames = list(age = 1, year = 1:nyears, cell = 1:nrow(nd)))
-    epsilon_st[, 1, ] <- delta_st[, 1, ]
-    for (y in 2:nyears) epsilon_st[, y, ] <- drift + epsilon_st[, y-1, ] + delta_st[, y, ]
-  } else if (st == "iid") {
-    epsilon_st <- delta_st
-  }
-
-  nd$omega_s <- omega_s[1, 1, ]
-  nd_y <- right_join(nd, reshape2::melt(epsilon_st[1, , ])) %>%
-    rename(epsilon_st = value) %>%
-    mutate(log_rho = ifelse(year > y_new_vessel, .env$log_rho, 0)) %>%
-    mutate(log_pred = omega_s + epsilon_st + log_rho,
-           pred = exp(log_pred),
-           log_pred_pop = omega_s + epsilon_st,
-           pred_pop = exp(log_pred_pop))
+    rho = ifelse(st == "rw", 1, 0),
+    B = c(1, 0),
+    sigma_O = sigma_O,
+    sigma_E = sigma_E,
+    phi = phi,
+    seed = seed
+  ) %>%
+    mutate(eta_pop = omega_s + epsilon_st,
+           mu_pop = exp(eta_pop))
 
   return(nd_y)
 }
 
 
-simulate_data <- function(om, phi = 1, nyears = 10,
+simulate_data <- function(om, phi = 1, #nyears = 10,
                           y_new_vessel = ceiling(0.5 * nyears),
-                          cluster = FALSE, seed, ...) {
+                          cluster = FALSE, seed, n_annual = 100,
+                          ...) {
   if (!missing(seed)) set.seed(seed)
   require(tidyverse)
   require(MASS)
 
-  n_annual <- 100
+  nyears <- max(om$year)
 
   dat <- lapply(1:nyears, function(y) {
     if (cluster) {
-      cell_y1 <- sample(unique(om$cell), ifelse(cluster, 0.5, 1) * n_annual)
+      cell_y1 <- sample(unique(om$cell), 0.5 * n_annual)
       cell_y2 <- pmin(cell_y1 + 1, max(om$cell))
       cell_y <- c(cell_y1, cell_y2)
     } else {
-      cell_y <- sample(unique(om$cell), ifelse(cluster, 0.5, 1) * n_annual)
+      cell_y <- sample(unique(om$cell), n_annual)
     }
     dplyr::filter(om, cell %in% cell_y, year == y)
   }) %>%
     bind_rows() %>%
     mutate(new_vessel = year > y_new_vessel)
 
-  dat$obs <- MASS::rnegbin(nrow(dat), mu = dat$pred, theta = phi)
+  dat$obs <- MASS::rnegbin(nrow(dat), mu = dat$mu, theta = phi)
 
   return(dat)
 }
@@ -96,7 +90,8 @@ fit_model_index <- function(dat,
   y_extra <- setdiff(y_all, y_data)
   extra_time <- if (length(y_extra)) y_extra else NULL
 
-  mesh <- sdmTMB::make_mesh(dat, c("X", "Y"), n_knots = 100)
+  #mesh <- sdmTMB::make_mesh(dat, c("X", "Y"), n_knots = 100)
+  mesh <- sdmTMB::make_mesh(dat, xy_cols = c("X", "Y"), type = "cutoff", cutoff = 0.04)
   fit <- sdmTMB(
     formula,
     dat,
