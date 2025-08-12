@@ -73,6 +73,29 @@ pars %>%
   reshape2::dcast(list("parameter", "Name"), value.var = "Estimate") %>%
   readr::write_csv("tables/ST_par.csv")
 
+
+# Plot comparison of log rho
+rho_CF <- readr::read_csv(here::here("tables/rho_CF.csv"))
+rho_ST <- readr::read_csv(here::here("tables/rho_ST.csv"))
+
+rho <- rbind(
+  rho_CF %>% select(Name, log_rho, lower, upper) %>% mutate(type = "CF"),
+  rho_ST %>% select(Name, Estimate, lower, upper) %>% rename(log_rho = Estimate) %>% mutate(type = "ST")
+) %>%
+  mutate(Name = factor(Name, Names))
+
+g <- ggplot(rho, aes(type, log_rho, ymin = lower, ymax = upper)) +
+  facet_wrap(vars(Name), scales = "free") +
+  geom_point() +
+  geom_linerange() +
+  coord_flip() +
+  theme(strip.background = element_blank()) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  labs(x = NULL, y = expression(Estimate%+-%1.96~"SE")) +
+  scale_x_discrete(labels = expression(log(rho[CF]), log(rho[ST])))
+ggsave("manuscript/figures/rho_casestudy.png", g, height = 3, width = 6)
+
+
 # Compare indices (with and without calibration)
 index <- lapply(1:nrow(case_studies), function(i) {
   s <- case_studies$code[i]
