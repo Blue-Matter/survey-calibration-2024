@@ -11,7 +11,7 @@ sim_OM <- function(i, sim_design, seed = 10392,
   range <- sim_design$range[i]
   nyears <- sim_design$nyears[i]
   log_rho <- sim_design$log_rho[i]
-  st <- match.arg(as.character(sim_design$st[i]), choices = c("rw", "iid"))
+
   drift <- sim_design$drift[i]
   stopifnot(drift == 0) # for (y in 2:nyears) epsilon_st[, y, ] <- drift + epsilon_st[, y-1, ] + delta_st[, y, ]
   phi <- sim_design$phi[i]
@@ -36,7 +36,7 @@ sim_OM <- function(i, sim_design, seed = 10392,
     family = nbinom2(),
     time = "year",
     range = range,
-    rho = ifelse(st == "rw", 1, 0),
+    rho = sim_design$ar_rho[i],
     B = c(1, 0),
     sigma_O = sigma_O,
     sigma_E = sigma_E,

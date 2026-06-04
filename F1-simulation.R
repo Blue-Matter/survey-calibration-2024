@@ -2,19 +2,22 @@
 # Run simulation
 library(tidyverse)
 library(snowfall)
+library(rlecuyer)
+
 sfInit(parallel = TRUE, cpus = 10)
 
 # Simulation design ----
 sim_design <- expand.grid(
-  sigma_O = 0.5,
-  sigma_E = 0.3,
+  sigma_O = 3,
+  sigma_E = 1,
   kappa = c(25, 50), # Low kappa = high range = low correlation at short distances
   nyears = 10,
   log_rho = c(0, 0.2, 1),
   st = "rw",
   drift = 0,
   cluster = FALSE,
-  phi = c(0.2, 4)
+  phi = c(0.2, 4),
+  ar_rho = c(1, 0.5)
 ) %>%
   mutate(range = sqrt(8)/kappa,
          OM = paste("OM", 1:nrow(.)))
