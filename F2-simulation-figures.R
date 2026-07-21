@@ -161,6 +161,15 @@ g <- rho_ret %>%
   theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
 ggsave("simulation/figures/rho_ret_OM.png", g, height = 6, width = 5)
 
+# Does CI get smaller?
+g <- rho_ret %>%
+  ggplot(aes(y, `Std. Error`)) +
+  geom_violin(draw_quantiles = c(0.025, 0.5, 0.975)) +
+  facet_wrap(vars(OM), ncol = 4) +
+  expand_limits(y = 0) +
+  labs(x = "Years after vessel change", y = expression(log(rho))) +
+  theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
+
 g <- rho_ret %>%
   summarise(median = median(Error),
             lower = quantile(Error, 0.025),
@@ -407,6 +416,15 @@ g <- rho_gap %>%
   labs(x = "Time gap between surveys", y = expression(log(rho))) +
   theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
 ggsave("simulation/figures/rho_gap.png", g, height = 6, width = 5)
+
+# Does CI get larger?
+g <- rho_gap %>%
+  ggplot(aes(factor(ngap), `Std. Error`)) +
+  geom_violin(draw_quantiles = c(0.025, 0.5, 0.975)) +
+  facet_wrap(vars(OM), ncol = 4) +
+  expand_limits(y = 0) +
+  labs(x = "Time gap between surveys", y = expression(log(rho))) +
+  theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
 
 rho_gap_stat <- rho_gap %>%
   summarise(bias = mean(Error) %>% round(2),
