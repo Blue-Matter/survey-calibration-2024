@@ -64,15 +64,13 @@ pars <- lapply(1:length(mod), function(i) {
   mutate(lower = Estimate - 1.96 * `Std. Error`, upper = Estimate + 1.96 * `Std. Error`)
 
 # Write table of rho_ST
-pars %>% filter(parameter == "log(rho)") %>%
-  readr::write_csv("tables/rho_ST.csv")
+readr::write_csv(
+  pars %>% filter(parameter == "log(rho)"),
+  "tables/rho_ST.csv"
+)
 
 # Write table of parameters (range, phi, sigma_E, sigma_O, etc.)
-pars %>%
-  mutate(Estimate = round(Estimate, 2)) %>%
-  reshape2::dcast(list("parameter", "Name"), value.var = "Estimate") %>%
-  readr::write_csv("tables/ST_par.csv")
-
+readr::write_csv(pars, "tables/ST_par.csv")
 
 # Plot comparison of log rho
 rho_CF <- readr::read_csv(here::here("tables/rho_CF.csv"))
@@ -224,6 +222,14 @@ g <- vessel_effect_ret %>%
   theme(strip.background = element_blank())
 ggsave("manuscript/figures/rho_retrospective.png", g, height = 4, width = 4)
 
+# Check if rho trend is significantly different from zero?
+lapply(Names, function(i) {
+  dat <- dplyr::filter(g@data, Name == i)
+  fit <- lm(Estimate ~ year_ret, data = dat)
+  summary(fit)
+}) %>%
+  structure(names = Names)
+
 
 # Gap (index)
 index_gap <- lapply(1:nrow(case_studies), function(i) {
@@ -292,6 +298,13 @@ g <- vessel_effect_gap %>%
   theme(strip.background = element_blank())
 ggsave("manuscript/figures/rho_gap.png", g, height = 4, width = 4)
 
+# Check if rho trend is significantly different from zero?
+lapply(Names, function(i) {
+  dat <- dplyr::filter(g@data, Name == i)
+  fit <- lm(Estimate ~ sequence, data = dat)
+  summary(fit)
+}) %>%
+  structure(names = Names)
 
 # Null test (index)
 index_null <- lapply(1:nrow(case_studies), function(i) {
