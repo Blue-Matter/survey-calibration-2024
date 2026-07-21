@@ -10,8 +10,32 @@ y <- m * x + ifelse(x <= xchange, 0, 7.5)
 set.seed(42)
 ysamp <- y + rnorm(length(y))
 
-fit <- lm(ysamp ~ x + x_fit)
-fit_notident <- lm(ysamp ~ factor(x))
+df <- data.frame(
+  x = x,
+  ysamp = ysamp,
+  j = x_fit
+)
+
+
+#fit <- sdmTMB::sdmTMB(
+#  ysamp ~ j,
+#  time = "x",
+#  spatial = "off",
+#  spatiotemporal = "off",
+#  time_varying = ~ 0 + x,
+#  time_varying_type = "rw",
+#  data = df
+#)
+#fit_notident <- sdmTMB::sdmTMB(
+#  ysamp ~ j + factor(x),
+#  spatial = "off",
+#  spatiotemporal = "off",
+#  data = df
+#)
+
+fit <- lm(ysamp ~ x + j, data = df)
+fit_notident <- lm(ysamp ~ factor(j) + factor(x), data = df)
+
 
 png("manuscript/figures/simple_example.png", height = 2.5, width = 3.5, units = "in", res = 400)
 par(mar = c(2, 2, 1, 1), mfrow = c(1, 1))
@@ -23,15 +47,19 @@ mtext("Year", 1, line = 1)
 mtext("Index", 2, line = 1)
 
 #lines(x, predict(fit_notident))
-
 lines(x[x_fit], predict(fit)[x_fit])
 lines(x[!x_fit], predict(fit)[!x_fit])
 
+#lines(x[x_fit], predict(fit)$est[x_fit])
+#lines(x[!x_fit], predict(fit)$est[!x_fit])
+
 #lines(x[x_fit], y[x_fit])
 #lines(x[!x_fit], y[!x_fit])
+
 abline(v = xchange + 0.5, lty = 2)
 dev.off()
 
+# Do not use
 
 png("manuscript/figures/simple_example2.png", height = 2.5, width = 6, units = "in", res = 400)
 par(mar = c(2, 2, 2, 1), mfrow = c(1, 2))
