@@ -21,6 +21,23 @@ index_om <- nd_plot %>%
 
 # OM figures ----
 
+# Compare AR1 vs RW field
+g <- nd_plot %>%
+  left_join(sim_design) %>%
+  mutate(lab = ifelse(ar_rho == 1, "RW OM", "AR1 OM")) %>%
+  filter(year %in% c(1, 10), kappa == 25, log_rho == 1, phi == 4) %>%
+  mutate(year = paste("Year", year)) %>%
+  left_join(sim_design, by = "OM") %>%
+  mutate(OM = factor(OM, sim_design$OM)) %>%
+  ggplot(aes(eta_pop)) +
+  geom_histogram() +
+  facet_grid(vars(year), vars(lab)) +
+  #facet_wrap(vars(kappa)) +
+  labs(x = "log(Density)") +
+  theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
+ggsave("simulation/figures/compare_density.png", g, height = 3, width = 6)
+
+
 # Spatial field
 g <- nd_plot %>%
   filter(year == 1) %>%
