@@ -159,16 +159,27 @@ index_ret <- lapply(1:nrow(case_studies), function(i) {
   bind_rows() %>%
   mutate(Name = factor(Name, levels = Names))
 
+Mohn_denom <- index_ret %>%
+  filter(year_ret == max(year_ret), .by = Name) %>%
+  select(year, est, Name) %>%
+  rename(denom = est)
+
+Mohn_diagnostic <- index_ret %>%
+  left_join(Mohn_denom) %>%
+  filter(year == year_ret) %>%
+  mutate(stat = est/denom - 1) %>%
+  summarise(stat = mean(stat), .by = Name) %>%
+  mutate(x = ifelse(Name %in% c("NL Cod", "NE W. hake"), Inf, -Inf))
+
 g <- index_ret %>%
   select(!se) %>%
   left_join(case_studies) %>%
   mutate(npeel = year_ret - year_new_vessel + 1) %>%
-  #mutate(est = est/mean(est), .by = Name) %>%
-  ggplot(aes(year, log(est), colour = factor(npeel))) +
-  #geom_point() +
-  geom_line() +
-  #expand_limits(y = 0) +
+  ggplot(aes(year, log_est)) +
+  geom_line(aes(colour = factor(npeel))) +
   geom_vline(data = case_studies, aes(xintercept = year_new_vessel - 0.5), linetype = 2) +
+  geom_label(data = Mohn_diagnostic, aes(x = x, label = round(stat, 2)),
+             y = Inf, hjust = "inward", vjust = "inward") +
   facet_wrap(vars(Name), scales = "free", ncol = 2) +
   labs(x = "Year", y = "log(Index)", colour = "Elapsed years") +
   theme(legend.position = "bottom", strip.background = element_blank())
