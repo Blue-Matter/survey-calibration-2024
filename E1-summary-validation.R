@@ -187,11 +187,7 @@ ggsave("manuscript/figures/index_retrospective.png", g, height = 6, width = 5)
 
 
 # Retrospective (gear effect)
-library(snowfall)
-sfInit(TRUE, nrow(case_studies))
-sfExport(list = c("case_studies"))
-sfLibrary(tidyverse)
-vessel_effect_ret <- sfLapply(1:nrow(case_studies), function(i) {
+vessel_effect_ret <- lapply(1:nrow(case_studies), function(i) {
 
   source("99-functions.R")
 
@@ -269,11 +265,7 @@ g <- index_gap %>%
 ggsave("manuscript/figures/index_gap.png", g, height = 6, width = 5)
 
 # Gap (gear effect)
-library(snowfall)
-sfInit(TRUE, nrow(case_studies))
-sfExport(list = c("case_studies"))
-sfLibrary(tidyverse)
-vessel_effect_gap <- sfLapply(1:nrow(case_studies), function(i) {
+vessel_effect_gap <- lapply(1:nrow(case_studies), function(i) {
 
   source("99-functions.R")
 
@@ -349,11 +341,7 @@ g <- index_null %>%
 ggsave("manuscript/figures/index_dummy.png", g, height = 7, width = 6)
 
 # Null test (vessel effect)
-library(snowfall)
-sfInit(TRUE, nrow(case_studies))
-sfExport(list = c("case_studies"))
-sfLibrary(tidyverse)
-vessel_effect_null <- sfLapply(1:nrow(case_studies), function(i) {
+vessel_effect_null <- lapply(1:nrow(case_studies), function(i) {
 
   source("99-functions.R")
 
@@ -389,14 +377,76 @@ g <- vessel_effect_null %>%
   theme(strip.background = element_blank(), axis.text.x = element_text(angle = 90, vjust = 0.5))
 ggsave("manuscript/figures/rho_null.png", g, height = 4.5, width = 3.5)
 
-sfStop()
+# Plot all diagnostics in one very large figure
+g1 <- vessel_effect_ret %>%
+  left_join(case_studies) %>%
+  mutate(npeel = year_ret - year_new_vessel + 1) %>%
+  ggplot(aes(factor(npeel), Estimate)) +
+  geom_ribbon(data = log_rho_df, fill = "grey80", aes(x, ymin = lower, ymax = upper), inherit.aes = FALSE) +
+  geom_hline(aes(yintercept = log_rho), linetype = 2) +
+  geom_point() +
+  geom_linerange(aes(ymin = lwr, max = upr)) +
+  #expand_limits(y = 0) +
+  coord_flip() +
+  facet_wrap(vars(Name), ncol = 1, scales = "free", strip.position = "right") +
+  labs(x = "Elapsed years", y = expression(widehat(log(rho))), subtitle = "Retrospective analysis") +
+  theme(strip.background = element_blank())
 
+g2 <- vessel_effect_gap %>%
+  left_join(case_studies) %>%
+  ggplot(aes(sequence, Estimate)) +
+  geom_ribbon(data = log_rho_df, fill = "grey80", aes(x, ymin = lower, ymax = upper), inherit.aes = FALSE) +
+  geom_hline(aes(yintercept = log_rho), linetype = 2) +
+  geom_point() +
+  facet_wrap(vars(Name), ncol = 1, scales = "free", strip.position = "right") +
+  coord_flip() +
+  geom_linerange(aes(ymin = lwr, max = upr)) +
+  labs(x = "Years between surveys", y = expression(widehat(log(rho))), subtitle = "Time gap evaluation") +
+  theme(strip.background = element_blank())
 
+g3 <- vessel_effect_null %>%
+  left_join(case_studies) %>%
+  mutate(ydummy = ifelse(grepl("NL", Name), 2005, 2015) + sequence - 1) %>%
+  ggplot(aes(factor(ydummy), Estimate)) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_point() +
+  facet_wrap(vars(Name), ncol = 1, scales = "free", strip.position = "right") +
+  coord_flip() +
+  geom_linerange(aes(ymin = lwr, max = upr)) +
+  labs(x = "Dummy year change", y = expression(widehat(log(rho))), subtitle = "True negative test") +
+  theme(strip.background = element_blank())
 
+g <- ggpubr::ggarrange(g3, g1, g2, ncol = 3)
+ggsave("manuscript/figures/diagnostics.png", g, height = 7, width = 6)
 
+# Try to do use facets but doesn't seem to work well
+if (FALSE) {
+  df <- rbind(
+    vessel_effect_ret %>%
+      left_join(case_studies) %>%
+      mutate(npeel = year_ret - year_new_vessel + 1) %>%
+      mutate(x = npeel, column = "Elapsed years") %>%
+      select(x, Estimate, lwr, upr, column, Name),
+    vessel_effect_gap %>%
+      left_join(case_studies) %>%
+      mutate(x = sequence, column = "Years between surveys") %>%
+      select(x, Estimate, lwr, upr, column, Name),
+    vessel_effect_null %>%
+      left_join(case_studies) %>%
+      mutate(ydummy = ifelse(grepl("NL", Name), 2005, 2015) + sequence - 1) %>%
+      mutate(x = factor(ydummy), column = "Dummy year change") %>%
+      select(x, Estimate, lwr, upr, column, Name)
+  )
 
-
-
+  g <- df %>%
+    ggplot(aes(x, Estimate)) +
+    geom_point() +
+    facet_grid(vars(Name), vars(column), scales = "free") +
+    geom_linerange(aes(ymin = lwr, max = upr)) +
+    coord_flip() +
+    labs(x = NULL, y = expression(widehat(log(rho)))) +
+    theme(strip.background = element_blank())
+}
 
 
 # Summary model objects
