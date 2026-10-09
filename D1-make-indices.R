@@ -2,6 +2,9 @@
 #2009
 
 library(tidyverse)
+
+#remotes::install_github("NOAA-EDAB/survdat")
+
 library(survdat)
 library(sf)
 library(sdmTMB)

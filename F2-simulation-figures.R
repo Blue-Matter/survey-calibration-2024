@@ -9,13 +9,13 @@ nd_y <- readRDS(file = "simulation/operating_model.rds")
 
 nd_plot <- lapply(1:nrow(sim_design), function(i) {
   nd_y[[i]] %>%
-    mutate(OM = paste("OM", i))
+    mutate(OM = paste("OM", i), cell_area = 0.02^2)
 }) %>%
   bind_rows()
 
 index_om <- nd_plot %>%
-  summarise(Population = sum(mu_pop),
-            Observed = sum(mu),
+  summarise(Population = sum(mu_pop * cell_area),
+            Observed = sum(mu * cell_area),
             .by = c(year, OM)) %>%
   reshape2::melt(id.vars = c("year", "OM"))
 
@@ -68,7 +68,7 @@ for (i in 1:nrow(sim_design)) {
 # Index
 g <- index_om %>%
   left_join(sim_design) %>%
-  mutate(Label = paste0("kappa=", kappa, ", rho=", log_rho, ", phi=", phi)) %>%
+  mutate(Label = paste0("kappa=", kappa, ", ARrho=", ar_rho, ", rho=", log_rho, ", phi=", phi)) %>%
   mutate(OM = factor(OM, sim_design$OM)) %>%
   ggplot(aes(year, log(value), linetype = variable, shape = variable)) +
   geom_point() +
@@ -108,26 +108,25 @@ index <- lapply(OM_plot, function(i) {
   filter(yret == 10) %>%
   mutate(geom_mean = exp(mean(log(est))), .by = c(OM, Simulation)) %>%
   mutate(value = est/geom_mean, OM = factor(OM, levels = paste("OM", OM_plot))) %>%
-  #mutate(value = est) %>%
-  #mutate(value = est/0.02/0.02) %>%
   left_join(sim_design, by = "OM") %>%
-  mutate(Label = paste0(OM, "\nkappa=", kappa, ", rho=", log_rho, ", phi=", phi))
+  mutate(Label = paste0(OM, "\nkappa=", kappa, ", AR rho=", ar_rho, ", rho=", log_rho, ", phi=", phi))
 
 index_om2 <- index_om %>%
   filter(OM %in% paste("OM", OM_plot), variable == "Population") %>%
-  mutate(geom_mean = exp(mean(log(value))), .by = OM) %>%
-  mutate(value = value/geom_mean) %>%
+  rename(est = value) %>%
+  mutate(geom_mean = exp(mean(log(est))), .by = OM) %>%
+  mutate(value = est/geom_mean) %>%
   left_join(sim_design) %>%
-  mutate(Label = paste0(OM, "\nkappa=", kappa, ", rho=", log_rho, ", phi=", phi))
+  mutate(Label = paste0(OM, "\nkappa=", kappa, ", AR rho=", ar_rho, ", rho=", log_rho, ", phi=", phi))
 
-g <- ggplot(index, aes(year, value)) +
+g <- ggplot(index, aes(year, log(est))) +
   geom_line(aes(group = Simulation), alpha = 0.1) +
   geom_line(data = index_om2, colour = "red", linewidth = 1) +
   geom_point(data = index_om2, shape = 21, fill = "white", colour = "red") +
   facet_wrap(vars(Label), ncol = 4, scales = "free_y") +
   expand_limits(y = 0) +
   #coord_cartesian(ylim = c(0, 4)) +
-  labs(x = "Year", y = "Index") +
+  labs(x = "Year", y = "log(Index)") +
   theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
 ggsave("simulation/figures/index_compare.png", g, height = 7, width = 10)
 
