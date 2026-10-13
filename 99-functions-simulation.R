@@ -127,7 +127,7 @@ fit_model_index <- function(dat,
 do_ret_sim <- function(dat_list, est_gear = TRUE) {
   sfExport(list = c("est_gear"))
 
-  index_ret <- sfLapply(dat_list, function(dat, est_gear) {
+  index_ret <- sfClusterApplyLB(dat_list, function(dat, est_gear) {
     require(dplyr)
 
     if (est_gear) {
@@ -177,7 +177,7 @@ do_ret_sim <- function(dat_list, est_gear = TRUE) {
 do_gap_sim <- function(dat_list, est_gear = TRUE) {
   sfExport(list = c("est_gear"))
 
-  index_gap <- sfLapply(dat_list, function(dat, est_gear) {
+  index_gap <- sfClusterApplyLB(dat_list, function(dat, est_gear) {
     require(dplyr)
 
     if (est_gear) {
