@@ -69,20 +69,18 @@ for (s in sp) {
   #### Spatial figure of set data ----
   nfld <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
     sf::st_crop(xmin = -59, xmax = -46, ymin = 45, ymax = 56)
-  g <- ggplot(dat) +
+  g <- dat %>%
+    filter(npue > 0) %>%
+    ggplot() +
     geom_sf(data = nfld) +
     coord_sf() +
-    geom_point(aes(long.start, lat.start, colour = npue), size = 0.5) +
-    scale_colour_viridis_c(trans = 'log') +
-    facet_wrap(vars(year)) +
-    labs(x = "Longitude", y = "Latitude", colour = "NPUE") +
-    theme(legend.position = "bottom", panel.spacing = unit(0, "in")) +
-    ggtitle(ifelse(sp == "cod", "Cod 2J+3KL", "Greenland halibut 2J+3KL"))
-
-  if (sp == "cod") {
-    g <- g + scale_colour_viridis_c(trans = 'log', breaks = c(55, 403, 2980))
-  }
-  .ggsave("npue_map.png", g, height = 12, width = 9)
+    geom_point(aes(long.start, lat.start, colour = log(npue)), size = 0.5) +
+    scale_colour_viridis_c() +
+    #facet_wrap(vars(year)) +
+    labs(x = "Longitude", y = "Latitude", colour = "log(NPUE)",
+         subtitle = expression("Area: 391422"~km^2)) +
+    theme(legend.position = "bottom", panel.spacing = unit(0, "in"))
+  .ggsave("npue_map.png", g, height = 5, width = 4)
 
   g <- ggplot(dat, aes(npue, fill = data.series)) +
     facet_wrap(vars(year)) +

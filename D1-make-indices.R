@@ -3,7 +3,7 @@
 
 library(tidyverse)
 
-#remotes::install_github("NOAA-EDAB/survdat")
+if (!"survdat" %in% installed.packages()) remotes::install_github("NOAA-EDAB/survdat")
 
 library(survdat)
 library(sf)
@@ -12,7 +12,13 @@ library(sdmTMB)
 source('99-functions.R')
 
 strata <- sf::st_read(dsn = system.file("extdata", "strata.shp", package = "survdat"), quiet = TRUE)
-area <- sf::st_read(dsn = system.file("extdata", "EPU.shp", package = "survdat"), quiet = TRUE)
+area <- sf::st_read(dsn = system.file("extdata", "EPU.shp", package = "survdat"), quiet = TRUE) %>%
+  st_make_valid()
+
+area$Area <- st_area(area) %>% units::set_units("km^2")
+area$sqrtArea <- sqrt(area$Area) %>% round(3)
+units(area$Area) # km^2
+area$Area
 
 #plot(strata)
 #splot(area)
@@ -90,8 +96,9 @@ for (s in sp) {
 
   if (s == "redfish") { # GOM only
 
+    area_s <- "GOM"
     set_intersect <- sf::st_intersects(
-      area[area$EPU == "GOM", ],
+      area[area$EPU %in% area_s, ],
       dat_sf
     ) %>% unlist()
 
@@ -101,14 +108,15 @@ for (s in sp) {
       mutate(calibration = ifelse(SV_VESSEL == "AL", 1.456, 1)) # Species 155, see survdat:::apply_conversion_factors
 
     grid_intersect <- sf::st_intersects(
-      area[area$EPU == "GOM", ],
+      area[area$EPU == area_s, ],
       grid_sf
     ) %>% unlist()
 
   } else if (s == "yt") { # GOM + GB
 
+    area_s <- c("GOM", "GB")
     set_intersect <- sf::st_intersects(
-      area[area$EPU %in% c("GOM", "GB"), ],
+      area[area$EPU %in% area_s, ],
       dat_sf
     ) %>% unlist()
 
@@ -118,7 +126,7 @@ for (s in sp) {
       mutate(calibration = ifelse(SV_VESSEL == "AL", 2.347, 1)) # Species 105, see survdat:::apply_conversion_factors
 
     grid_intersect <- sf::st_intersects(
-      area[area$EPU %in% c("GOM", "GB"), ],
+      area[area$EPU %in% area_s, ],
       grid_sf
     ) %>% unlist()
 
@@ -127,10 +135,12 @@ for (s in sp) {
     catch_all <- readr::read_csv("validation_nefsc/Spring/22561_UNION_FSCS_SVCAT.csv") %>%
       select(CRUISE6, STRATUM, TOW, STATION, SVSPP, EXPCATCHNUM, SCIENTIFIC_NAME)
 
-    if (s == "whitehake") { # GOM
+    if (s == "whitehake") { # GOM + GB
+
+      area_s <- c("GOM", "GB")
 
       set_intersect <- sf::st_intersects(
-        area[area$EPU %in% c("GOM", "GB"), ],
+        area[area$EPU %in% area_s, ],
         dat_sf
       ) %>% unlist()
 
@@ -141,18 +151,16 @@ for (s in sp) {
         mutate(calibration = ifelse(SV_VESSEL == "AL", 2.235, 1)) # Species 076, see survdat:::apply_conversion_factors
 
       grid_intersect <- sf::st_intersects(
-        area[area$EPU %in% c("GOM", "GB"), ],
+        area[area$EPU %in% area_s, ],
         grid_sf
       ) %>% unlist()
 
-      plot_shapefile(area) +
-        geom_point(data = dat %>% filter(NPUE> 0), aes(LON, LAT, colour = NPUE)) +
-        scale_colour_viridis_c()
-
     } else if (s == "butterfish") { # Mid-Atlantic (All)
 
+      area_s <- c("GOM", "GB", "MAB", "SS")
+
       set_intersect <- sf::st_intersects(
-        st_make_valid(area),
+        area[area$EPU %in% area_s, ],
         dat_sf
       ) %>% unlist()
 
@@ -163,13 +171,14 @@ for (s in sp) {
         mutate(calibration = ifelse(SV_VESSEL == "AL", 1.487, 1)) # Species 131, see survdat:::apply_conversion_factors
 
       grid_intersect <- sf::st_intersects(
-        st_make_valid(area),
+        area[area$EPU %in% area_s, ],
         grid_sf
       ) %>% unlist()
     }
   }
 
   grid2 <- grid[grid_intersect, ]
+  grid2_sf <- grid_sf[grid_intersect, ]
 
   .ggsave <- function(filename, ...) {
     filename <- paste0("validation_nefsc/figures/", s, "_", filename)
@@ -177,14 +186,19 @@ for (s in sp) {
   }
 
   #### Spatial figure of set data ----
-  #g <- plot_shapefile(area[1:2, ]) +
-  #  geom_point(data = dat, aes(LON, LAT, colour = NPUE), size = 0.5) +
-  #  scale_colour_viridis_c(trans = 'log') +
-  #  facet_wrap(vars(year)) +
-  #  labs(x = "Longitude", y = "Latitude", colour = "NPUE") +
-  #  #theme(legend.position = "bottom", panel.spacing = unit(0, "in")) +
-  #  theme(panel.spacing = unit(0, "in"))
-  #.ggsave("npue_map.png", g, height = 12, width = 9)
+  area_val <- parse(
+    text = paste0("Area:~", sum(filter(area, EPU %in% area_s) |> pull(Area) |> round(0)), "~km^2")
+  )
+  g <- filter(area, EPU %in% area_s) %>%
+    ggplot() +
+    geom_sf(color = "grey", alpha = 0.5) +
+    geom_point(data = dat %>% filter(NPUE > 0), aes(LON, LAT, colour = log(NPUE)), size = 0.5) +
+    scale_colour_viridis_c(trans = 'identity') +
+    #facet_wrap(vars(year)) +
+    labs(x = "Longitude", y = "Latitude", subtitle = eval(area_val)) +
+    theme(legend.position = "bottom", panel.spacing = unit(0, "in")) +
+    theme(panel.spacing = unit(0, "in"))
+  .ggsave("npue_map.png", g, height = 5, width = 4)
 
   #mesh <- make_mesh(dat, c("X", "Y"), type = "cutoff", cutoff = 20)
 

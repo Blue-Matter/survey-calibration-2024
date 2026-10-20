@@ -7,6 +7,15 @@ library(stars)
 strata_shp <- read_sf("shapefiles/2HJ3KLNOP_Strata_Polygons_WGS84.shp") %>%
   st_transform(crs = 32622)
 
+# Calculate area
+strata_area <- strata_shp %>%
+  st_make_valid() %>%
+  filter(DIV %in% c("2J", "3K", "3L")) %>%
+  mutate(Area = st_area(.) |> units::set_units("km^2")) %>%
+  summarise(area = sum(area), geometry = st_union(geometry), Area = sum(Area), .by = DIV)
+plot(strata_area)
+sum(strata_area$Area) # 391422.1 km^2
+
 grid_all <- sf::st_make_grid(strata_shp, cellsize = c(5000, 5000), what = "polygons")
 
 ind_all <- st_within(grid_all, strata_shp) %>%
