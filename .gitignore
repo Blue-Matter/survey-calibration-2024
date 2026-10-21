@@ -10,3 +10,4 @@ knitr-figs-docx
 shapefiles/
 validation_size
 *powerpoint/
+*.docx

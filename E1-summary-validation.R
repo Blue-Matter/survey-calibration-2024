@@ -377,8 +377,20 @@ g <- vessel_effect_null %>%
   theme(strip.background = element_blank(), axis.text.x = element_text(angle = 90, vjust = 0.5))
 ggsave("manuscript/figures/rho_null.png", g, height = 4.5, width = 3.5)
 
-# Plot all diagnostics in one very large figure
-g1 <- vessel_effect_ret %>%
+# Plot diagnostics in one very large figure
+g1 <- vessel_effect_null %>%
+  left_join(case_studies) %>%
+  mutate(ydummy = ifelse(grepl("NL", Name), 2005, 2015) + sequence - 1) %>%
+  ggplot(aes(factor(ydummy), Estimate)) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_point() +
+  facet_wrap(vars(Name), ncol = 1, scales = "free", strip.position = "right") +
+  coord_flip() +
+  geom_linerange(aes(ymin = lwr, max = upr)) +
+  labs(x = "Dummy year change", y = expression(widehat(log(rho))), subtitle = "True negative test") +
+  theme(strip.background = element_blank())
+
+g2 <- vessel_effect_ret %>%
   left_join(case_studies) %>%
   mutate(npeel = year_ret - year_new_vessel + 1) %>%
   ggplot(aes(factor(npeel), Estimate)) +
@@ -392,34 +404,24 @@ g1 <- vessel_effect_ret %>%
   labs(x = "Elapsed years", y = expression(widehat(log(rho))), subtitle = "Retrospective analysis") +
   theme(strip.background = element_blank())
 
-g2 <- vessel_effect_gap %>%
+g <- ggpubr::ggarrange(g1, g2, ncol = 2)
+ggsave("manuscript/figures/diagnostics.png", g, height = 7, width = 4)
+
+# Separate figure for survey gap
+g <- vessel_effect_gap %>%
   left_join(case_studies) %>%
   ggplot(aes(sequence, Estimate)) +
   geom_ribbon(data = log_rho_df, fill = "grey80", aes(x, ymin = lower, ymax = upper), inherit.aes = FALSE) +
   geom_hline(aes(yintercept = log_rho), linetype = 2) +
   geom_point() +
-  facet_wrap(vars(Name), ncol = 1, scales = "free", strip.position = "right") +
+  facet_wrap(vars(Name), ncol = 2, scales = "free", strip.position = "right") +
   coord_flip() +
   geom_linerange(aes(ymin = lwr, max = upr)) +
   labs(x = "Years between surveys", y = expression(widehat(log(rho))), subtitle = "Time gap evaluation") +
   theme(strip.background = element_blank())
+ggsave("manuscript/figures/rho_gap.png", g, height = 4, width = 4)
 
-g3 <- vessel_effect_null %>%
-  left_join(case_studies) %>%
-  mutate(ydummy = ifelse(grepl("NL", Name), 2005, 2015) + sequence - 1) %>%
-  ggplot(aes(factor(ydummy), Estimate)) +
-  geom_hline(yintercept = 0, linetype = 2) +
-  geom_point() +
-  facet_wrap(vars(Name), ncol = 1, scales = "free", strip.position = "right") +
-  coord_flip() +
-  geom_linerange(aes(ymin = lwr, max = upr)) +
-  labs(x = "Dummy year change", y = expression(widehat(log(rho))), subtitle = "True negative test") +
-  theme(strip.background = element_blank())
-
-g <- ggpubr::ggarrange(g3, g1, g2, ncol = 3)
-ggsave("manuscript/figures/diagnostics.png", g, height = 7, width = 6)
-
-# Try to do use facets but doesn't seem to work well
+# Try to use facets but doesn't seem to work well
 if (FALSE) {
   df <- rbind(
     vessel_effect_ret %>%
