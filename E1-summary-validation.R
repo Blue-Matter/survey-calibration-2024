@@ -38,6 +38,69 @@ filename <- c("validation/models/cod_fit_full.rds", "validation/models/ghl_fit_f
 
 mod <- lapply(filename, readRDS)
 
+# Plot set data
+NPUE <- lapply(1:length(mod), function(i) {
+  if (grepl("NL", Names[i])) {
+    mutate(mod[[i]][["data"]], NPUE = number/swept.area) %>%
+      select(NPUE, lat.start, long.start) %>%
+      rename(LAT = lat.start, LON = long.start) %>%
+      mutate(Name = Names[i])
+  } else {
+    mutate(mod[[i]][["data"]], NPUE = CATCH/EFFORT) %>%
+      select(NPUE, LAT, LON) %>%
+      mutate(Name = Names[i])
+  }
+}) %>%
+  bind_rows() %>%
+  mutate(Name = factor(Name, Names))
+
+area <- data.frame(
+  Name = Names,
+  Area = c(391422, 391422, 282336, 68194, 125426, 125426)
+)
+readr::write_csv(area, file = "tables/survey_area.csv")
+
+nfld <- rnaturalearth::ne_coastline(scale = 10, returnclass = "sf") %>%
+  sf::st_crop(xmin = -59, xmax = -46, ymin = 45, ymax = 56)
+coast <- lapply(1:length(mod), function(i) {
+  require(sf)
+  if (grepl("NL", Names[i])) {
+    nfld <- rnaturalearth::ne_countries(scale = 10, returnclass = "sf") %>%
+      st_make_valid() %>%
+      sf::st_crop(xmin = -59, xmax = -46, ymin = 45, ymax = 56)
+    return(nfld)
+  } else {
+    xrange <- range(mod[[i]]$data$LON, na.rm = TRUE) + c(-0.5, 0.5)
+    yrange <- range(mod[[i]]$data$LAT, na.rm = TRUE) + c(-0.5, 0.5)
+
+    rnaturalearth::ne_countries(scale = 10, returnclass = "sf") %>%
+      st_make_valid() %>%
+      sf::st_crop(xmin = xrange[1], xmax = xrange[2], ymin = yrange[1], ymax = yrange[2])
+  }
+})
+
+glist <- lapply(1:length(mod), function(i) {
+  g <- NPUE %>%
+    filter(NPUE > 0, Name == Names[i]) %>%
+    ggplot(aes(LON, LAT)) +
+    geom_point(size = 0.25, data = filter(NPUE, NPUE == 0, Name == Names[i]), shape = 4, colour = "grey80") +
+    geom_point(size = 0.25, aes(colour = log(NPUE))) +
+    geom_sf(data = coast[[i]], inherit.aes = FALSE) +
+    coord_sf() +
+    scale_colour_viridis_c() +
+    labs(x = NULL, y = NULL, title = Names[i],
+         subtitle = parse(text = paste0("\"", format(area$Area[i], big.mark = ","), "\"~km^2")) |> eval()) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  g
+})
+
+
+library(patchwork)
+g <- glist[[1]] + glist[[2]] + glist[[3]] + glist[[4]] + glist[[5]] + glist[[6]] +
+  plot_layout(ncol = 2, nrow = 3, axis_titles = "collect")
+ggsave("manuscript/figures/NPUE_casestudy.png", g, height = 8, width = 7)
+
+
 #lapply(mod, sdmTMB::tidy)
 rho_ind <- c(4, 4, 2, 2, 2, 2)
 pars <- lapply(1:length(mod), function(i) {
@@ -92,7 +155,6 @@ g <- ggplot(rho, aes(type, log_rho, ymin = lower, ymax = upper)) +
   labs(x = NULL, y = expression(Estimate%+-%1.96~"SE")) +
   scale_x_discrete(labels = expression(log(rho[CF]), log(rho[ST])))
 ggsave("manuscript/figures/rho_casestudy.png", g, height = 3, width = 6)
-
 
 # Compare indices (with and without calibration)
 index <- lapply(1:nrow(case_studies), function(i) {
