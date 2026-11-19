@@ -42,17 +42,19 @@ mod <- lapply(filename, readRDS)
 NPUE <- lapply(1:length(mod), function(i) {
   if (grepl("NL", Names[i])) {
     mutate(mod[[i]][["data"]], NPUE = number/swept.area) %>%
-      select(NPUE, lat.start, long.start) %>%
+      select(NPUE, lat.start, long.start, year) %>%
       rename(LAT = lat.start, LON = long.start) %>%
       mutate(Name = Names[i])
   } else {
     mutate(mod[[i]][["data"]], NPUE = CATCH/EFFORT) %>%
-      select(NPUE, LAT, LON) %>%
+      select(NPUE, LAT, LON, year) %>%
       mutate(Name = Names[i])
   }
 }) %>%
   bind_rows() %>%
   mutate(Name = factor(Name, Names))
+
+#reshape2::dcast(NPUE, year ~ Name, fun.aggregate = length)
 
 area <- data.frame(
   Name = Names,
