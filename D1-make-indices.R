@@ -39,16 +39,21 @@ area$Area
 #  mean(na.rm = TRUE)
 
 #table(dat_set$year, dat_set$SVGEAR)
+station <- readr::read_csv("validation_nefsc/Spring/22561_UNION_FSCS_SVSTA.csv") # Merge AVGDEPTH
+
 dat_set <- readr::read_csv("validation_nefsc/NEFSC_spring_03282025.csv") %>%
+  left_join(station %>% select(CRUISE6, STATION, SHG, STRATUM, TOW, AVGDEPTH)) %>%
   mutate(DT = as.POSIXlt(EST_DATE_TIME, format = "%m/%d/%Y %H:%M:%S"),
          D = as.POSIXlt(EST_DATE_TIME, format = "%m/%d/%Y")) %>%
   mutate(year = lubridate::year(DT)) %>%
   mutate(year = ifelse(is.na(year), lubridate::year(D), year)) %>%
-  #filter(SV_VESSEL != "DE", year >= 1983) %>%
+  filter(SV_VESSEL != "DE", year >= 1983) %>%
   mutate(EFFORT = ifelse(is.na(AREA_SWEPT_WINGS_MEAN_KM2) & SV_VESSEL == "AL", 0.03995142, AREA_SWEPT_WINGS_MEAN_KM2)) %>%
   mutate(EFFORT = ifelse(is.na(AREA_SWEPT_WINGS_MEAN_KM2) & SV_VESSEL == "HB", 0.02393521, EFFORT)) %>%
   mutate(SV_VESSEL = factor(SV_VESSEL, levels = c("AL", "HB")))
 dat_sf <- sf::st_as_sf(dat_set, coords = c("LON", "LAT"), crs = "NAD83")
+
+depth <- summarise(dat_set, n = n(), p_NA = mean(!is.na(AVGDEPTH)), .by = c(year, SV_VESSEL))
 
 # See Miller 2010 for calibration factors from comparative fishing
 #
@@ -106,6 +111,7 @@ for (s in sp) {
       mutate(CATCH = ifelse(is.na(SEBASTES_F_NUM), 0, SEBASTES_F_NUM)) %>%
       mutate(NPUE = CATCH/EFFORT) %>%
       mutate(calibration = ifelse(SV_VESSEL == "AL", 1.456, 1)) # Species 155, see survdat:::apply_conversion_factors
+    depth <- summarise(dat, n = n(), p_NA = mean(!is.na(AVGDEPTH)), .by = c(year, SV_VESSEL))
 
     grid_intersect <- sf::st_intersects(
       area[area$EPU == area_s, ],
@@ -124,6 +130,7 @@ for (s in sp) {
       mutate(CATCH = ifelse(is.na(LIMANDA_F_NUM), 0, LIMANDA_F_NUM)) %>%
       mutate(NPUE = CATCH/EFFORT) %>%
       mutate(calibration = ifelse(SV_VESSEL == "AL", 2.347, 1)) # Species 105, see survdat:::apply_conversion_factors
+    depth <- summarise(dat, n = n(), p_NA = mean(!is.na(AVGDEPTH)), .by = c(year, SV_VESSEL))
 
     grid_intersect <- sf::st_intersects(
       area[area$EPU %in% area_s, ],
@@ -149,6 +156,7 @@ for (s in sp) {
         mutate(CATCH = ifelse(is.na(EXPCATCHNUM), 0, EXPCATCHNUM)) %>%
         mutate(NPUE = EXPCATCHNUM/EFFORT) %>%
         mutate(calibration = ifelse(SV_VESSEL == "AL", 2.235, 1)) # Species 076, see survdat:::apply_conversion_factors
+      depth <- summarise(dat, n = n(), p_NA = mean(!is.na(AVGDEPTH)), .by = c(year, SV_VESSEL))
 
       grid_intersect <- sf::st_intersects(
         area[area$EPU %in% area_s, ],
@@ -169,6 +177,7 @@ for (s in sp) {
         mutate(CATCH = ifelse(is.na(EXPCATCHNUM), 0, EXPCATCHNUM)) %>%
         mutate(NPUE = EXPCATCHNUM/EFFORT) %>%
         mutate(calibration = ifelse(SV_VESSEL == "AL", 1.487, 1)) # Species 131, see survdat:::apply_conversion_factors
+      depth <- summarise(dat, n = n(), p_NA = mean(!is.na(AVGDEPTH)), .by = c(year, SV_VESSEL))
 
       grid_intersect <- sf::st_intersects(
         area[area$EPU %in% area_s, ],
