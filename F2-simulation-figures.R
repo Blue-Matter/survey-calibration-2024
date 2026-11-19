@@ -179,13 +179,19 @@ g <- rho_ret %>%
   coord_cartesian(ylim = c(0.5, 1)) +
   scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
   labs(x = "Years after vessel change",
-       y = expression("Coverage"~log(rho)),
+       y = expression("Coverage"~widehat(log(rho))),
        colour = expression(kappa),
        shape = expression(phi)) +
   theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
 ggsave("manuscript/figures/sim_rho_coverage_retrospective.png", g, height = 4, width = 4)
 
-# Rho error ----
+# Make table for paper
+p_cov_table <- g@data %>%
+  filter(y == 5) %>%
+  reshape2::dcast(log_rho + kappa ~ ar_rho + phi, value.var = "p_coverage")
+readr::write_csv(p_cov_table, "tables/coverage_rho.csv")
+
+# Rho error during retrospective ----
 g <- rho_ret %>%
   filter(!cluster) %>%
   summarise(median = median(Error),
@@ -284,6 +290,7 @@ index_ret <- lapply(OM_plot, function(i) {
 
 }) %>%
   bind_rows()
+
 index_ret_norho <- lapply(OM_plot, function(i) {
 
   res <- readRDS(paste0("simulation/results_ret_", i, "_norho.rds"))
