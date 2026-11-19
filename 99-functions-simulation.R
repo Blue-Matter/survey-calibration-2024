@@ -1,7 +1,8 @@
 
 sim_OM <- function(i, sim_design, seed = 10392,
                    y_new_vessel = ceiling(0.5 * nyears),
-                   cell_width = 0.02) {
+                   cell_width = 0.02,
+                   intercept = 1) {
   set.seed(seed)
   require(tidyverse)
   require(sdmTMB)
@@ -26,18 +27,17 @@ sim_OM <- function(i, sim_design, seed = 10392,
     bind_rows() %>%
     mutate(log_rho = ifelse(year > y_new_vessel, .env$log_rho, 0))
 
-  #mesh <- sdmTMB::make_mesh(nd2, xy_cols = c("X", "Y"), n_knots = 100)
   mesh <- sdmTMB::make_mesh(nd2, xy_cols = c("X", "Y"), type = "cutoff", cutoff = 0.04)
 
   nd_y <- sdmTMB_simulate(
-    ~ 0 + log_rho + cell,
+    ~ 1 + log_rho + cell,
     data = nd2,
     mesh = mesh,
     family = nbinom2(),
     time = "year",
     range = range,
     rho = sim_design$ar_rho[i],
-    B = c(1, 0),
+    B = c(log(intercept), 1, 0),
     sigma_O = sigma_O,
     sigma_E = sigma_E,
     phi = phi,
@@ -46,17 +46,17 @@ sim_OM <- function(i, sim_design, seed = 10392,
     mutate(eta_pop = omega_s + epsilon_st,
            mu_pop = exp(eta_pop))
 
-  return(nd_y)
+  return(list(nd_y = nd_y, mesh = mesh))
 }
 
 
 simulate_data <- function(om, phi = 1, #nyears = 10,
                           y_new_vessel = ceiling(0.5 * nyears),
                           cluster = FALSE, seed, n_annual = 100,
+                          resample = TRUE,
                           ...) {
   if (!missing(seed)) set.seed(seed)
   require(tidyverse)
-  require(MASS)
 
   nyears <- max(om$year)
 
@@ -73,14 +73,17 @@ simulate_data <- function(om, phi = 1, #nyears = 10,
     bind_rows() %>%
     mutate(new_vessel = year > y_new_vessel)
 
-  dat$obs <- MASS::rnegbin(nrow(dat), mu = dat$mu, theta = phi)
+  if (resample) {
+    require(MASS)
+    dat$observed <- MASS::rnegbin(nrow(dat), mu = dat$mu, theta = phi)
+  }
 
   return(dat)
 }
 
-fit_model_index <- function(dat,
-                            formula = obs ~ 1 + new_vessel,
-                            grid_pred, cell_area = 1, get_se = FALSE, ...) {
+fit_model_index <- function(dat, mesh_om,
+                            formula = observed ~ 1 + new_vessel,
+                            grid_pred, cell_area = 1, start = list(), get_se = FALSE, ...) {
 
   require(tidyverse)
   require(sdmTMB)
@@ -90,9 +93,9 @@ fit_model_index <- function(dat,
   y_extra <- setdiff(y_all, y_data)
   extra_time <- if (length(y_extra)) y_extra else NULL
 
-  #mesh <- sdmTMB::make_mesh(dat, c("X", "Y"), n_knots = 100)
-  mesh <- sdmTMB::make_mesh(dat, xy_cols = c("X", "Y"), type = "cutoff", cutoff = 0.04)
-  fit <- sdmTMB(
+  mesh <- sdmTMB::make_mesh(dat, xy_cols = c("X", "Y"), mesh = mesh_om$mesh)
+
+  fit <- sdmTMB::sdmTMB(
     formula,
     dat,
     mesh,
@@ -100,50 +103,62 @@ fit_model_index <- function(dat,
     extra_time = extra_time,
     spatiotemporal = "rw",
     family = nbinom2(),
-    ...
+    control = sdmTMB::sdmTMBcontrol(start = start)
+    #...
   )
 
-  newdata <- grid_pred %>%
-    mutate(new_vessel = FALSE)
-
-  pred <- predict(
-    fit,
-    newdata = newdata,
-    return_tmb_object = get_se
-  )
-
-  if (get_se) {
-    index <- get_index(pred, bias_correct = TRUE, area = cell_area)
+  if (packageVersion('sdmTMB') >= "1.2.0") {
+    index <- sdmTMB::get_index(fit, newdata = grid_pred, bias_correct = TRUE, area = cell_area)
   } else {
-    index <- pred %>%
-      summarise(est = sum(exp(est) * cell_area), .by = year)
+    pred <- predict(
+      fit,
+      newdata = grid_pred,
+      return_tmb_object = get_se
+    )
+
+    if (get_se) {
+      index <- get_index(pred, bias_correct = TRUE, area = cell_area)
+    } else {
+      index <- pred %>%
+        summarise(est = sum(exp(est) * cell_area), .by = year)
+    }
   }
+
   sd_report <- summary(fit$sd_report, select = c("fixed", "report"))
 
   return(list(index = index, sd_report = sd_report))
 
 }
 
-do_ret_sim <- function(dat_list, est_gear = TRUE) {
-  sfExport(list = c("est_gear"))
-
-  index_ret <- sfClusterApplyLB(dat_list, function(dat, est_gear) {
+do_ret_sim <- function(dat_list, est_gear = TRUE, cell_width, start = list()) {
+  index_ret <- sfClusterApplyLB(dat_list, function(dat_i, est_gear, cell_width, start) {
     require(dplyr)
 
     if (est_gear) {
-      formula <- obs ~ 1 + new_vessel
+      formula <- observed ~ 1 + new_vessel
     } else {
-      formula <- obs ~ 1
+      formula <- observed ~ 1
     }
 
     yret <- 6:10
+    dat <- dat_i[["nd_y"]]
+    mesh_om <- dat_i[["mesh"]]
 
     out <- lapply(yret, function(y) {
       dat_y <- dplyr::filter(dat, year <= y)
-      grid_pred <- dplyr::select(om, X, Y, year) %>%
-        dplyr::filter(year <= y)
-      try(fit_model_index(dat_y, formula, grid_pred = grid_pred, cell_area = cell_width^2, get_se = TRUE),
-          silent = TRUE)
+      grid_pred <- lapply(seq_len(y), function(yy) {
+        as.data.frame(mesh_om$loc_xy) %>% mutate(year = yy)
+      }) %>%
+        bind_rows() %>%
+        mutate(new_vessel = FALSE)
+      try(
+        fit_model_index(
+          dat_y, mesh_om = mesh_om,
+          formula, grid_pred = grid_pred, cell_area = cell_width^2,
+          start = start, get_se = TRUE
+        ),
+        silent = TRUE
+      )
     })
 
     index <- lapply(1:length(yret), function(y) {
@@ -169,31 +184,42 @@ do_ret_sim <- function(dat_list, est_gear = TRUE) {
       bind_rows()
 
     return(list(index = index, sd_report = sd_report))
-  }, est_gear = est_gear)
+  }, est_gear = est_gear, cell_width = cell_width, start = start)
 
   return(index_ret)
 }
 
-do_gap_sim <- function(dat_list, est_gear = TRUE) {
-  sfExport(list = c("est_gear"))
+do_gap_sim <- function(dat_list, est_gear = TRUE, cell_width, start = list()) {
 
-  index_gap <- sfClusterApplyLB(dat_list, function(dat, est_gear) {
+  index_gap <- sfClusterApplyLB(dat_list, function(dat_i, est_gear, cell_width, start) {
     require(dplyr)
 
     if (est_gear) {
-      formula <- obs ~ 1 + new_vessel
+      formula <- observed ~ 1 + new_vessel
     } else {
-      formula <- obs ~ 1
+      formula <- observed ~ 1
     }
 
     ygap <- 6:9
+    dat <- dat_i[["nd_y"]]
+    mesh_om <- dat_i[["mesh"]]
 
     out <- lapply(1:length(ygap), function(y) {
       ymissing <- seq(ygap[1], ygap[y])
       dat_y <- dplyr::filter(dat, !year %in% ymissing)
-      grid_pred <- dplyr::select(om, X, Y, year)
-      try(fit_model_index(dat_y, formula, grid_pred = grid_pred, cell_area = cell_width^2, get_se = TRUE),
-          silent = TRUE)
+      grid_pred <- lapply(seq_len(max(dat$year)), function(yy) {
+        as.data.frame(mesh_om$loc_xy) %>% mutate(year = yy)
+      }) %>%
+        bind_rows() %>%
+        mutate(new_vessel = FALSE)
+      try(
+        fit_model_index(
+          dat_y, mesh_om = mesh_om,
+          formula, grid_pred = grid_pred, cell_area = cell_width^2,
+          start = start, get_se = TRUE
+        ),
+        silent = TRUE
+      )
     })
 
     index <- lapply(1:length(ygap), function(y) {
@@ -221,7 +247,7 @@ do_gap_sim <- function(dat_list, est_gear = TRUE) {
       bind_rows()
 
     return(list(index = index, sd_report = sd_report))
-  }, est_gear = est_gear)
+  }, est_gear = est_gear, cell_width = cell_width, start = start)
 
   return(index_gap)
 }
