@@ -147,7 +147,7 @@ do_ret_sim <- function(dat_list, est_gear = TRUE, cell_width, start = list()) {
     out <- lapply(yret, function(y) {
       dat_y <- dplyr::filter(dat, year <= y)
       grid_pred <- lapply(seq_len(y), function(yy) {
-        as.data.frame(mesh_om$loc_xy) %>% mutate(year = yy)
+        dplyr::distinct(as.data.frame(mesh_om$loc_xy)) %>% mutate(year = yy)
       }) %>%
         bind_rows() %>%
         mutate(new_vessel = FALSE)
@@ -208,7 +208,7 @@ do_gap_sim <- function(dat_list, est_gear = TRUE, cell_width, start = list()) {
       ymissing <- seq(ygap[1], ygap[y])
       dat_y <- dplyr::filter(dat, !year %in% ymissing)
       grid_pred <- lapply(seq_len(max(dat$year)), function(yy) {
-        as.data.frame(mesh_om$loc_xy) %>% mutate(year = yy)
+        dplyr::distinct(as.data.frame(mesh_om$loc_xy)) %>% mutate(year = yy)
       }) %>%
         bind_rows() %>%
         mutate(new_vessel = FALSE)
