@@ -602,13 +602,14 @@ ggsave("manuscript/figures/sim_trend_RMSE_gap.png", g, height = 4, width = 5)
 
 
 # Index coverage using SE's
-# Absolute scale: predictions use new_vessel = FALSE, so est is on the OM scale
+# Relative to geometric mean over same years
 # Only years after the vessel change (year > 5)
 calculate_index_coverage <- function(index_est, index_om) {
   index_est %>%
-    filter(year > 5) %>%
     left_join(index_om, by = c("OM", "year", "Simulation")) %>%
-    mutate(good_coverage = lwr <= Population & upr >= Population) %>%
+    mutate(Pop_rel = Population / exp(mean(log(Population))), .by = c(OM, Simulation, yret)) %>%
+    filter(year > 5) %>%
+    mutate(good_coverage = lwr / geom_mean <= Pop_rel & upr / geom_mean >= Pop_rel) %>%
     summarise(p_coverage = mean(good_coverage), .by = c(OM, yret)) %>%
     left_join(sim_design, by = "OM") %>%
     mutate(y = factor(yret - 5)) %>%
@@ -632,7 +633,7 @@ g <- coverage_ret %>%
   coord_cartesian(ylim = c(0, 1)) +
   scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
   labs(x = "Years after vessel change",
-       y = expression("Coverage"~log(Index)),
+       y = expression("Coverage relative"~log(Index)),
        colour = expression(kappa),
        shape = expression(phi)) +
   theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
