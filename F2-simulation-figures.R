@@ -12,7 +12,7 @@ if (FALSE) {
     nd_y <- readRDS(file = paste0("simulation_simfield/operating_model_", i, ".rds"))
     nsim <- length(nd_y)
     lapply(1:nsim, function(x) {
-      nd_y[[i]][[1]] %>% mutate(Simulation = x)
+      nd_y[[x]][[1]] %>% mutate(Simulation = x)
     }) %>%
       bind_rows() %>%
       mutate(OM = paste("OM", i))
