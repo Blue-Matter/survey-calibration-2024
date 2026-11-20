@@ -103,7 +103,7 @@ fit_model_index <- function(dat, mesh_om,
     extra_time = extra_time,
     spatiotemporal = "rw",
     family = nbinom2(),
-    control = sdmTMB::sdmTMBcontrol(start = start, multiphase = FALSE)
+    control = sdmTMB::sdmTMBcontrol(start = start)
     #...
   )
 
