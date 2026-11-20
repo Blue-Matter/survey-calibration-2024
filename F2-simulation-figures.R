@@ -139,6 +139,14 @@ ggsave("simulation_simfield/figures/index.png", g, height = 8, width = 8)
 # Results ----
 OM_plot <- 1:24
 
+# Converged fits (sigma_E > 0)
+converged_fits <- function(sd_report) {
+  if (!nrow(sd_report)) return(NULL)
+  sd_report %>%
+    filter(par_name == "sigma_E", round(Estimate, 2) > 0) %>%
+    select(any_of(c("yret", "ngap")))
+}
+
 # Plot error in simulated vs. estimated index
 # Use geometric mean for trend
 get_estimated_index <- function(OM_plot, est_rho = TRUE, type = c("retro", "gap")) {
@@ -166,15 +174,11 @@ get_estimated_index <- function(OM_plot, est_rho = TRUE, type = c("retro", "gap"
     res <- readRDS(filename)
     nsim <- length(res)
     lapply(1:nsim, function(x) {
-      st_check <- res[[x]]$sd_report %>%
-        filter(par_name == "sigma_E") %>%
-        filter(round(Estimate, 2) > 0)
-
-      if (nrow(st_check)) { # Check for convergence
-        return(res[[x]]$index %>% mutate(Simulation = x))
-      } else {
-        return(data.frame())
-      }
+      ok <- converged_fits(res[[x]]$sd_report)
+      if (!length(ok) || !nrow(ok)) return(NULL)
+      res[[x]]$index %>%
+        semi_join(ok, by = names(ok)) %>%
+        mutate(Simulation = x)
     }) %>%
       bind_rows() %>%
       mutate(OM = paste("OM", i))
