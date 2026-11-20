@@ -96,14 +96,14 @@ for (i in seq(1, length(scenario))) {
   # Run gap ----
   message("Part 3")
   tictoc::tic()
-  index_gap <- do_gap_sim(dat_list)
+  index_gap <- do_gap_sim(dat_list, cell_width = cell_width)
   tictoc::toc()
   saveRDS(index_gap, paste0("simulation_simfield/results_gap_", i, ".rds"))
 
   # Run gap w/o gear effect ----
   message("Part 4")
   tictoc::tic()
-  index_gap_norho <- do_gap_sim(dat_list, FALSE)
+  index_gap_norho <- do_gap_sim(dat_list, FALSE, cell_width = cell_width)
   tictoc::toc()
   saveRDS(index_gap_norho, paste0("simulation_simfield/results_gap_", i, "_norho.rds"))
 
