@@ -230,7 +230,10 @@ get_estimated_rho <- function(OM_plot, type = c("retro", "gap")) {
     res <- readRDS(filename)
     nsim <- length(res)
     lapply(1:nsim, function(x) {
+      ok <- converged_fits(res[[x]]$sd_report)
+      if (!length(ok) || !nrow(ok)) return(NULL)
       res[[x]]$sd_report %>% filter(par_name == "b_j.1") %>%
+        semi_join(ok, by = names(ok)) %>%
         mutate(Simulation = x)
     }) %>%
       bind_rows() %>%
