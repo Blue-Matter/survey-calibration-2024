@@ -172,21 +172,20 @@ get_estimated_index <- function(OM_plot, est_rho = TRUE, type = c("retro", "gap"
       mutate(OM = paste("OM", i))
   }) %>%
     bind_rows() %>%
-    mutate(geom_mean = exp(mean(log(est))), .by = c(OM, Simulation)) %>%
-    mutate(est_rel = est/geom_mean,
-           lwr_rel = lwr/geom_mean,
-           upr_rel = upr/geom_mean)
+    mutate(geom_mean = exp(mean(log(est))),
+           .by = c(OM, Simulation, any_of(c("yret", "ngap")))) %>%
+    mutate(est_rel = est/geom_mean)
 }
 
 index_est <- get_estimated_index(OM_plot)
 
 index_om <- index_om %>%
-  filter(OM %in% paste("OM", OM_plot)) %>%
-  mutate(geom_mean = exp(mean(log(Population))), .by = c(OM, Simulation)) %>%
-  mutate(Pop_rel = Population/geom_mean)
+  filter(OM %in% paste("OM", OM_plot))
 
 # Plot annual error
+# Normalise the OM over the same years as each retrospective peel
 g <- left_join(index_est, index_om, by = c("year", "OM", "Simulation")) %>%
+  mutate(Pop_rel = Population / exp(mean(log(Population))), .by = c(OM, Simulation, yret)) %>%
   left_join(sim_design, by = "OM") %>%
   mutate(Label = paste0(OM, "\nkappa=", kappa, ", AR rho=", ar_rho, ", rho=", log_rho, ", phi=", phi)) %>%
   ggplot(aes(year, log(est_rel/Pop_rel))) +
