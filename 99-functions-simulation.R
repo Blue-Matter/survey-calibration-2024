@@ -43,7 +43,7 @@ sim_OM <- function(i, sim_design, seed = 10392,
     phi = phi,
     seed = seed
   ) %>%
-    mutate(eta_pop = log(intercept) + omega_s + epsilon_st,
+    mutate(eta_pop = intercept +omega_s + epsilon_st,
            mu_pop = exp(eta_pop))
 
   return(list(nd_y = nd_y, mesh = mesh))
