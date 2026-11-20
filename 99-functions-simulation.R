@@ -2,7 +2,7 @@
 sim_OM <- function(i, sim_design, seed = 10392,
                    y_new_vessel = ceiling(0.5 * nyears),
                    cell_width = 0.02,
-                   intercept = 1) {
+                   intercept = 0) {
   set.seed(seed)
   require(tidyverse)
   require(sdmTMB)
@@ -37,7 +37,7 @@ sim_OM <- function(i, sim_design, seed = 10392,
     time = "year",
     range = range,
     rho = sim_design$ar_rho[i],
-    B = c(log(intercept), 1, 0),
+    B = c(intercept, 1, 0),
     sigma_O = sigma_O,
     sigma_E = sigma_E,
     phi = phi,
@@ -81,7 +81,7 @@ simulate_data <- function(om, phi = 1, #nyears = 10,
   return(dat)
 }
 
-fit_model_index <- function(dat, mesh_om,
+fit_model_index <- function(dat, mesh_om = NULL,
                             formula = observed ~ 1 + new_vessel,
                             grid_pred, cell_area = 1, start = list(), get_se = FALSE, ...) {
 
@@ -93,7 +93,11 @@ fit_model_index <- function(dat, mesh_om,
   y_extra <- setdiff(y_all, y_data)
   extra_time <- if (length(y_extra)) y_extra else NULL
 
-  mesh <- sdmTMB::make_mesh(dat, xy_cols = c("X", "Y"), type = "cutoff", cutoff = 0.04)
+  if (is.null(mesh_om)) {
+    mesh <- sdmTMB::make_mesh(dat, xy_cols = c("X", "Y"), type = "cutoff", cutoff = 0.04, mesh = NULL)
+  } else {
+    mesh <- sdmTMB::make_mesh(dat, xy_cols = c("X", "Y"), mesh = mesh_om$mesh)
+  }
 
   fit <- sdmTMB::sdmTMB(
     formula,
@@ -130,8 +134,15 @@ fit_model_index <- function(dat, mesh_om,
 
 }
 
-do_ret_sim <- function(dat_list, est_gear = TRUE, cell_width, start = list()) {
-  index_ret <- sfClusterApplyLB(dat_list, function(dat_i, est_gear, cell_width, start) {
+do_ret_sim <- function(dat_list, est_gear = TRUE, cell_width, start = list(), use_om_mesh = TRUE, do_parallel = TRUE) {
+
+  if (do_parallel) {
+    fn <- snowfall::sfClusterApplyLB
+  } else {
+    fn <- base::lapply
+  }
+
+  index_ret <- fn(dat_list, function(dat_i, est_gear, cell_width, start) {
     require(dplyr)
 
     if (est_gear) {
@@ -153,7 +164,7 @@ do_ret_sim <- function(dat_list, est_gear = TRUE, cell_width, start = list()) {
         mutate(new_vessel = FALSE)
       try(
         fit_model_index(
-          dat_y, mesh_om = mesh_om,
+          dat_y, mesh_om = NULL,
           formula, grid_pred = grid_pred, cell_area = cell_width^2,
           start = start, get_se = TRUE
         ),
@@ -189,7 +200,12 @@ do_ret_sim <- function(dat_list, est_gear = TRUE, cell_width, start = list()) {
   return(index_ret)
 }
 
-do_gap_sim <- function(dat_list, est_gear = TRUE, cell_width, start = list()) {
+do_gap_sim <- function(dat_list, est_gear = TRUE, cell_width, start = list(), do_parallel = TRUE) {
+  if (do_parallel) {
+    fn <- snowfall::sfClusterApplyLB
+  } else {
+    fn <- base::lapply
+  }
 
   index_gap <- sfClusterApplyLB(dat_list, function(dat_i, est_gear, cell_width, start) {
     require(dplyr)
@@ -214,7 +230,7 @@ do_gap_sim <- function(dat_list, est_gear = TRUE, cell_width, start = list()) {
         mutate(new_vessel = FALSE)
       try(
         fit_model_index(
-          dat_y, mesh_om = mesh_om,
+          dat_y, mesh_om = NULL,
           formula, grid_pred = grid_pred, cell_area = cell_width^2,
           start = start, get_se = TRUE
         ),
