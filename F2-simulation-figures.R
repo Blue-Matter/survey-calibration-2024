@@ -133,7 +133,7 @@ g <- index_om %>%
 ggsave("simulation_simfield/figures/index.png", g, height = 8, width = 8)
 
 # Results ----
-OM_plot <- 1:15
+OM_plot <- 1:24
 
 # Plot error in simulated vs. estimated index
 # Use geometric mean for trend
