@@ -4,7 +4,7 @@ library(tidyverse)
 library(snowfall)
 library(rlecuyer)
 
-sfInit(parallel = TRUE, cpus = 15)
+sfInit(parallel = TRUE, cpus = 25)
 
 # Simulation design ----
 relative_range <- range_dist <- c(0.4, 0.55, 0.8) # Relative range equal to range because sqrt(Area) = 1
@@ -35,7 +35,8 @@ cell_width <- 0.02
 scenario <- 1:nrow(sim_design)
 intercept <- log(50)
 
-if (FALSE) {
+generate_data <- FALSE
+if (generate_data) {
 
   sfExport(list = "sim_OM")
   for (i in scenario) {
@@ -65,7 +66,7 @@ if (FALSE) {
 
 # Fit models ----
 sfExport(list = "fit_model_index")
-for (i in seq(1, length(scenario))) {
+for (i in scenario) {
   message("OM ", i)
   dat_list <- readRDS(paste0("simulation_simfield/dat_list_", i, ".rds"))
 
