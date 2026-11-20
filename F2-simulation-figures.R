@@ -155,6 +155,10 @@ get_estimated_index <- function(OM_plot, est_rho = TRUE, type = c("retro", "gap"
       )
     }
 
+    if (!file.exists(filename)) {
+      message("Missing ", filename)
+      return(NULL)
+    }
     res <- readRDS(filename)
     nsim <- length(res)
     lapply(1:nsim, function(x) {
@@ -209,6 +213,10 @@ get_estimated_rho <- function(OM_plot, type = c("retro", "gap")) {
       paste0("simulation_simfield/results_ret_", i, ".rds"),
       paste0("simulation_simfield/results_gap_", i, ".rds")
     )
+    if (!file.exists(filename)) {
+      message("Missing ", filename)
+      return(NULL)
+    }
     res <- readRDS(filename)
     nsim <- length(res)
     lapply(1:nsim, function(x) {
