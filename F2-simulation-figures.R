@@ -385,18 +385,18 @@ trend_ret_stat <- rbind(
   summarise(bias = mean(Error),
             MAE = mean(abs(Error)),
             MARE = mean(abs(Error_rel)),
-            MSE = sqrt(mean(Error^2)),
-            RMSE = sqrt(mean(Error_rel^2)),
+            RMSE = sqrt(mean(Error^2)),
+            RRMSE = sqrt(mean(Error_rel^2)),
             .by = c(y, OM, est_rho)) %>%
   left_join(sim_design) %>%
   mutate(OM = factor(OM, levels = sim_design$OM)) %>%
   mutate(row = paste0("log(rho)==", log_rho)) %>%
   mutate(column = ifelse(ar_rho == 1, "RW~OM", "AR1~OM"))
 
-# Index trend MSE (mean square error)
+# Index trend RMSE (root mean square error)
 g <- trend_ret_stat %>%
   filter(est_rho, !cluster) %>%
-  ggplot(aes(y, MSE, colour = factor(kappa), ymin = 0, ymax = MSE, group = OM)) +
+  ggplot(aes(y, RMSE, colour = factor(kappa), ymin = 0, ymax = RMSE, group = OM)) +
   #geom_hline(yintercept = 0, linetype = 3) +
   geom_pointrange(position = position_dodge(0.5), aes(shape = factor(phi))) +
   facet_grid(vars(row), vars(column), labeller = "label_parsed") +
@@ -404,15 +404,15 @@ g <- trend_ret_stat %>%
   coord_cartesian(ylim = c(0, 0.8)) +
   scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
   labs(x = "Years after vessel change",
-       y = "MSE in 5-year log(Index) trend",
+       y = "RMSE in 5-year log(Index) trend",
        colour = expression(kappa),
        shape = expression(phi)) +
   theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank()) +
   geom_pointrange(data = trend_ret_stat %>% filter(!est_rho, !cluster),
                   position = position_dodge(0.5), shape = 4, linetype = 3,
                   show.legend = FALSE)
-ggsave("simulation_simfield/figures/sim_trend_MSE_retrospective.png", g, height = 4, width = 5)
-ggsave("manuscript/figures/sim_trend_MSE_retrospective.png", g, height = 4, width = 5)
+ggsave("simulation_simfield/figures/sim_trend_RMSE_retrospective.png", g, height = 4, width = 5)
+ggsave("manuscript/figures/sim_trend_RMSE_retrospective.png", g, height = 4, width = 5)
 
 
 
@@ -484,20 +484,20 @@ ggsave("manuscript/figures/sim_rho_coverage_gap.png", g, height = 4, width = 4)
 # Rho RMSE ----
 g <- rho_gap %>%
   filter(!cluster) %>%
-  summarise(MSE = sqrt(mean(Error^2)),
+  summarise(RMSE = sqrt(mean(Error^2)),
             .by = c(ngap, log_rho, ar_rho, cluster, OM, kappa, phi)) %>%
   mutate(row = paste0("log(rho)==", log_rho)) %>%
   mutate(column = ifelse(ar_rho == 1, "RW~OM", "AR1~OM")) %>%
   ggplot(aes(ngap, Error, colour = factor(kappa))) +
   geom_pointrange(fatten = 3.5, #shape = 1,
                   position = position_dodge(0.6),
-                  aes(y = MSE, ymin = 0, ymax = MSE, group = OM, shape = factor(phi))) +
+                  aes(y = RMSE, ymin = 0, ymax = RMSE, group = OM, shape = factor(phi))) +
   facet_grid(vars(row), vars(column), labeller = "label_parsed") +
   #facet_wrap(vars(row), labeller = "label_parsed") +
   #coord_cartesian(ylim = c(-1.1, 1.1)) +
   scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
   labs(x = "Time gap between surveys",
-       y = expression("MSE"~widehat(log(rho))),
+       y = expression("RMSE"~widehat(log(rho))),
        colour = expression(kappa),
        shape = expression(phi)) +
   theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
@@ -553,8 +553,8 @@ trend_gap_stat <- rbind(
   trend_gap, trend_gap_norho
 ) %>%
   summarise(bias = mean(Error),
-            MRE = mean(abs(Error)),
-            MSE = sqrt(mean(Error^2)),
+            MAE = mean(abs(Error)),
+            RMSE = sqrt(mean(Error^2)),
             .by = c(ngap, OM, est_rho, ar_rho)) %>%
   left_join(sim_design) %>%
   #mutate(y = factor(yret - 5)) %>%
@@ -565,7 +565,7 @@ trend_gap_stat <- rbind(
 
 g <- trend_gap_stat %>%
   filter(est_rho, !cluster) %>%
-  ggplot(aes(ngap, MSE, colour = factor(kappa), ymin = 0, ymax = MSE, group = OM)) +
+  ggplot(aes(ngap, RMSE, colour = factor(kappa), ymin = 0, ymax = RMSE, group = OM)) +
   #geom_hline(yintercept = 0, linetype = 3) +
   geom_pointrange(position = position_dodge(0.5), aes(shape = factor(phi))) +
   facet_grid(vars(row), vars(column), labeller = "label_parsed") +
@@ -573,7 +573,7 @@ g <- trend_gap_stat %>%
   coord_cartesian(ylim = c(0, 1.5)) +
   scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
   labs(x = "Time gap between surveys",
-       y = "MSE in 5-year log(Index) trend",
+       y = "RMSE in 5-year log(Index) trend",
        colour = expression(kappa),
        shape = expression(phi)) +
   theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank()) +
