@@ -93,7 +93,7 @@ fit_model_index <- function(dat, mesh_om,
   y_extra <- setdiff(y_all, y_data)
   extra_time <- if (length(y_extra)) y_extra else NULL
 
-  mesh <- sdmTMB::make_mesh(dat, xy_cols = c("X", "Y"), mesh = mesh_om$mesh)
+  mesh <- sdmTMB::make_mesh(dat, xy_cols = c("X", "Y"), type = "cutoff", cutoff = 0.04)
 
   fit <- sdmTMB::sdmTMB(
     formula,
