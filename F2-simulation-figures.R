@@ -42,50 +42,50 @@ index_om <- readRDS(file = "simulation_simfield/index_om.rds")
 
 
 if (has_fields) {
-# Manuscript figure of two fields that vary in kappa with sampling locations----
-samp <- lapply(1:2, function(i) {
-  readRDS(paste0("simulation_simfield/dat_list_", i, ".rds"))[[1]][["nd_y"]] %>%
-    filter(year == 10) %>%
-    select(!log_rho) %>%
-    cbind(sim_design[i, ])
-}) %>%
-  bind_rows() %>%
-  mutate(kappa = paste("kappa==", kappa))
 
-pop <- nd_plot %>%
-  filter(year == 10, Simulation == 1, OM %in% paste("OM", 1:2)) %>%
-  left_join(sim_design, by = c("log_rho", "OM")) %>%
-  mutate(kappa = paste("kappa==", kappa))
+  # Manuscript figure of two fields that vary in kappa with sampling locations----
+  samp <- lapply(1:2, function(i) {
+    readRDS(paste0("simulation_simfield/dat_list_", i, ".rds"))[[1]][["nd_y"]] %>%
+      filter(year == 10) %>%
+      select(!log_rho) %>%
+      cbind(sim_design[i, ])
+  }) %>%
+    bind_rows() %>%
+    mutate(kappa = paste("kappa==", kappa))
 
-g <- pop %>%
-  ggplot(aes(X, Y)) +
-  geom_tile(aes(fill = eta_pop)) +
-  geom_point(data = samp, shape = 21, fill = "grey80") +
-  facet_wrap(vars(kappa), labeller = label_parsed) +
-  coord_cartesian(expand = FALSE) +
-  scale_fill_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
-  labs(fill = "log(Density)") +
-  theme(strip.background = element_blank())
-ggsave("simulation_simfield/figures/sampling.png", g, height = 2.5, width = 6)
-ggsave("manuscript/figures/sampling.png", g, height = 2.5, width = 6)
+  pop <- nd_plot %>%
+    filter(year == 10, Simulation == 1, OM %in% paste("OM", 1:2)) %>%
+    left_join(sim_design, by = c("log_rho", "OM")) %>%
+    mutate(kappa = paste("kappa==", kappa))
 
+  g <- pop %>%
+    ggplot(aes(X, Y)) +
+    geom_tile(aes(fill = eta_pop)) +
+    geom_point(data = samp, shape = 21, fill = "grey80") +
+    facet_wrap(vars(kappa), labeller = label_parsed) +
+    coord_cartesian(expand = FALSE) +
+    scale_fill_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
+    labs(fill = "log(Density)") +
+    theme(strip.background = element_blank())
+  ggsave("simulation_simfield/figures/sampling.png", g, height = 2.5, width = 6)
+  ggsave("manuscript/figures/sampling.png", g, height = 2.5, width = 6)
 
-# OM figures ----
+  # OM figures ----
 
-# Spatial field
-g <- nd_plot %>%
-  filter(year == 1, Simulation == 1) %>%
-  #filter(OM %in% c("OM 1", "OM 2")) %>%
-  left_join(sim_design, by = "OM") %>%
-  mutate(OM = factor(OM, sim_design$OM)) %>%
-  ggplot(aes(X, Y, fill = omega_s)) +
-  geom_tile() +
-  facet_wrap(vars(OM)) +
-  #facet_wrap(vars(kappa)) +
-  scale_fill_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
-  coord_cartesian(expand = FALSE) +
-  theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
-ggsave("simulation_simfield/figures/omega_s.png", g, height = 8, width = 8)
+  # Spatial field
+  g <- nd_plot %>%
+    filter(year == 1, Simulation == 1) %>%
+    #filter(OM %in% c("OM 1", "OM 2")) %>%
+    left_join(sim_design, by = "OM") %>%
+    mutate(OM = factor(OM, sim_design$OM)) %>%
+    ggplot(aes(X, Y, fill = omega_s)) +
+    geom_tile() +
+    facet_wrap(vars(OM)) +
+    #facet_wrap(vars(kappa)) +
+    scale_fill_gradient2(low = scales::muted("blue"), high = scales::muted("red")) +
+    coord_cartesian(expand = FALSE) +
+    theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
+  ggsave("simulation_simfield/figures/omega_s.png", g, height = 8, width = 8)
 }
 
 # I don't find these very informative
@@ -252,7 +252,7 @@ g <- rho_ret %>%
   ggplot(aes(y, Estimate)) +
   geom_violin(linewidth = 0.5, draw_quantiles = c(0.025, 0.5, 0.975)) +
   facet_wrap(vars(OM), ncol = 4) +
-  geom_hline(data = filter(sim_design, OM %in% paste("OM", OM_plot)), aes(yintercept = log_rho), linetype = 2) +
+  geom_hline(data = filter(sim_design, OM %in% rho_ret$OM), aes(yintercept = log_rho), linetype = 2) +
   labs(x = "Years after vessel change", y = expression(log(rho))) +
   theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
 ggsave("simulation_simfield/figures/rho_ret_OM.png", g, height = 6, width = 5)
@@ -393,7 +393,7 @@ g <- trend_ret %>%
   #coord_cartesian(ylim = c(-0.4, 0.4)) +
   scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
   labs(x = "Years after vessel change",
-       y = "Error in log(Index) slope",
+       y = "Error in 5-year log(Index) trend",
        colour = expression(kappa),
        shape = expression(phi)) +
   theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
@@ -422,7 +422,7 @@ g <- trend_ret_stat %>%
   geom_pointrange(position = position_dodge(0.5), aes(shape = factor(phi))) +
   facet_grid(vars(row), vars(column), labeller = "label_parsed") +
   #facet_wrap(vars(row), labeller = "label_parsed") +
-  coord_cartesian(ylim = c(0, 0.8)) +
+  coord_cartesian(ylim = c(0, 0.4)) +
   scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
   labs(x = "Years after vessel change",
        y = "RMSE in 5-year log(Index) trend",
@@ -491,7 +491,7 @@ g <- rho_gap %>%
   #                ymin = 0, aes(ymax = p_coverage, group = OM, shape = factor(phi))) +
   facet_grid(vars(row), vars(column), labeller = "label_parsed") +
   #facet_wrap(vars(row), labeller = "label_parsed") +
-  coord_cartesian(ylim = c(0.5, 1)) +
+  coord_cartesian(ylim = c(0.8, 1)) +
   scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
   labs(x = "Time gap between surveys",
        y = expression("Coverage"~widehat(log(rho))),
@@ -591,7 +591,7 @@ g <- trend_gap_stat %>%
   geom_pointrange(position = position_dodge(0.5), aes(shape = factor(phi))) +
   facet_grid(vars(row), vars(column), labeller = "label_parsed") +
   #facet_wrap(vars(row), labeller = "label_parsed") +
-  coord_cartesian(ylim = c(0, 1.5)) +
+  coord_cartesian(ylim = c(0, 0.5)) +
   scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
   labs(x = "Time gap between surveys",
        y = "RMSE in 5-year log(Index) trend",
@@ -624,23 +624,23 @@ calculate_index_coverage <- function(index_est, index_om) {
     mutate(column = ifelse(ar_rho == 1, "RW~OM", "AR1~OM"))
 }
 
-coverage_ret <- calculate_index_coverage(index_ret, index_om)
-coverage_ret_norho <- calculate_index_coverage(index_ret_norho, index_om)
+coverage_ret <- calculate_index_coverage(index_ret, index_om) %>% mutate(est_rho = "Indirect calibration")
+coverage_ret_norho <- calculate_index_coverage(index_ret_norho, index_om) %>% mutate(est_rho = "No calibration")
 
 g <- coverage_ret %>%
   ggplot(aes(y, p_coverage, group = OM, colour = factor(kappa))) +
   geom_hline(yintercept = 0.95, linetype = 3) +
-  geom_line(position = position_dodge(0.0)) +
-  geom_point(position = position_dodge(0.0), aes(group = OM, shape = factor(phi))) +
+  geom_line(aes(group = OM)) +
+  geom_point(aes(shape = factor(phi))) +
 
-  geom_line(data = coverage_ret_norho, linetype = 2, position = position_dodge(0.0)) +
-  geom_point(data = coverage_ret_norho, position = position_dodge(0.0), aes(group = OM, shape = factor(phi))) +
+  geom_line(data = coverage_ret_norho, linetype = 2) +
+  geom_point(data = coverage_ret_norho, aes(shape = factor(phi))) +
 
   facet_grid(vars(row), vars(column), labeller = "label_parsed") +
   coord_cartesian(ylim = c(0, 1)) +
   scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
   labs(x = "Years after vessel change",
-       y = expression("Coverage relative"~log(Index)),
+       y = "Coverage of relative index",
        colour = expression(kappa),
        shape = expression(phi)) +
   theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
