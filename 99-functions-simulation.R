@@ -207,7 +207,7 @@ do_gap_sim <- function(dat_list, est_gear = TRUE, cell_width, start = list(), do
     fn <- base::lapply
   }
 
-  index_gap <- sfClusterApplyLB(dat_list, function(dat_i, est_gear, cell_width, start) {
+  index_gap <- fn(dat_list,function(dat_i, est_gear, cell_width, start) {
     require(dplyr)
 
     if (est_gear) {
