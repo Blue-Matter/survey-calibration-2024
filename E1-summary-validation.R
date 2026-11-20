@@ -42,12 +42,15 @@ mod <- lapply(filename, readRDS)
 NPUE <- lapply(1:length(mod), function(i) {
   if (grepl("NL", Names[i])) {
     mutate(mod[[i]][["data"]], NPUE = number/swept.area) %>%
-      select(NPUE, lat.start, long.start, year) %>%
+      select(NPUE, lat.start, long.start, year, log_depth) %>%
       rename(LAT = lat.start, LON = long.start) %>%
       mutate(Name = Names[i])
   } else {
+    station <- readr::read_csv("validation_nefsc/Spring/22561_UNION_FSCS_SVSTA.csv", show_col_types = FALSE) # Merge AVGDEPTH
     mutate(mod[[i]][["data"]], NPUE = CATCH/EFFORT) %>%
-      select(NPUE, LAT, LON, year) %>%
+      left_join(station %>% select(CRUISE6, STATION, SHG, STRATUM, TOW, AVGDEPTH)) %>%
+      mutate(log_depth = log(AVGDEPTH)) %>%
+      select(NPUE, LAT, LON, year, log_depth) %>%
       mutate(Name = Names[i])
   }
 }) %>%
@@ -102,6 +105,21 @@ g <- glist[[1]] + glist[[2]] + glist[[3]] + glist[[4]] + glist[[5]] + glist[[6]]
   plot_layout(ncol = 2, nrow = 3, axis_titles = "collect")
 ggsave("manuscript/figures/NPUE_casestudy.png", g, height = 8, width = 7)
 
+# Plot NPUE by depth
+g <- NPUE %>%
+  filter(NPUE < quantile(NPUE, probs = 0.99), .by = Name) %>%
+  ggplot(aes(exp(log_depth), NPUE)) +
+  geom_point(alpha = 0.15) +
+  facet_wrap(vars(Name), scales = "free") +
+  labs(x = "log(Depth)") +
+  scale_x_continuous(transform = "log",
+                     labels = scales::label_comma(),
+                     breaks = scales::breaks_log(base = exp(1))) +
+  theme(strip.background = element_blank())
+ggsave("manuscript/figures/NPUE_casestudy_depth.png", g, height = 4, width = 6)
+
+
+# Get coefficients
 
 #lapply(mod, sdmTMB::tidy)
 rho_ind <- c(4, 4, 2, 2, 2, 2)
