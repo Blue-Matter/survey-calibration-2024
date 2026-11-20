@@ -35,10 +35,13 @@ if (FALSE) {
   saveRDS(index_om, file = "simulation_simfield/index_om.rds")
 
 }
-nd_plot <- readRDS(file = "simulation_simfield/simulated_fields.rds")
+# Simulated fields are large (2+ GB) and only needed for the sampling and omega_s figures
+has_fields <- file.exists("simulation_simfield/simulated_fields.rds")
+if (has_fields) nd_plot <- readRDS(file = "simulation_simfield/simulated_fields.rds")
 index_om <- readRDS(file = "simulation_simfield/index_om.rds")
 
 
+if (has_fields) {
 # Manuscript figure of two fields that vary in kappa with sampling locations----
 samp <- lapply(1:2, function(i) {
   readRDS(paste0("simulation_simfield/dat_list_", i, ".rds"))[[1]][["nd_y"]] %>%
@@ -83,6 +86,7 @@ g <- nd_plot %>%
   coord_cartesian(expand = FALSE) +
   theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
 ggsave("simulation_simfield/figures/omega_s.png", g, height = 8, width = 8)
+}
 
 # I don't find these very informative
 if (FALSE) {
