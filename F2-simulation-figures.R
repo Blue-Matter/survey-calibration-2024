@@ -194,7 +194,9 @@ index_om <- index_om %>%
 # Normalise the OM over the same years as each retrospective peel
 g <- left_join(index_est, index_om, by = c("year", "OM", "Simulation")) %>%
   mutate(Pop_rel = Population / exp(mean(log(Population))), .by = c(OM, Simulation, yret)) %>%
+  filter(yret == max(yret)) %>% # full time series only
   left_join(sim_design, by = "OM") %>%
+  mutate(OM = factor(OM, levels = sim_design$OM)) %>%
   mutate(Label = paste0(OM, "\nkappa=", kappa, ", AR rho=", ar_rho, ", rho=", log_rho, ", phi=", phi)) %>%
   ggplot(aes(year, log(est_rel/Pop_rel))) +
   geom_line(aes(group = Simulation), alpha = 0.1) +
