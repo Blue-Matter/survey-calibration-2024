@@ -588,34 +588,25 @@ ggsave("manuscript/figures/sim_trend_RMSE_gap.png", g, height = 4, width = 5)
 
 
 # Index coverage using SE's
-calculate_index_coverage <- function(index_est, index_om, rel = TRUE) {
-  if (rel) {
-    index_est %>%
-      #filter(year >= yret) %>%
-      left_join(index_om, by = c("OM", "year", "Simulation")) %>%
-      mutate(good_coverage = lwr <= Population & upr >= Population) %>%
-      summarise(p_coverage = mean(good_coverage), .by = c(OM, yret)) %>%
-      left_join(sim_design) %>%
-      mutate(row = paste0("log(rho)==", log_rho)) %>%
-      mutate(column = ifelse(ar_rho == 1, "RW~OM", "AR1~OM")) %>%
-      mutate(y = yret - min())
-  } else {
-    index_est %>%
-      #filter(year >= yret) %>%
-      left_join(index_om, by = c("OM", "year", "Simulation")) %>%
-      mutate(good_coverage = lwr_rel <= Pop_rel & upr_rel >= Pop_rel) %>%
-      summarise(p_coverage = mean(good_coverage), .by = c(OM, yret)) %>%
-      left_join(sim_design) %>%
-      mutate(row = paste0("log(rho)==", log_rho)) %>%
-      mutate(column = ifelse(ar_rho == 1, "RW~OM", "AR1~OM"))
-  }
+# Absolute scale: predictions use new_vessel = FALSE, so est is on the OM scale
+# Only years after the vessel change (year > 5)
+calculate_index_coverage <- function(index_est, index_om) {
+  index_est %>%
+    filter(year > 5) %>%
+    left_join(index_om, by = c("OM", "year", "Simulation")) %>%
+    mutate(good_coverage = lwr <= Population & upr >= Population) %>%
+    summarise(p_coverage = mean(good_coverage), .by = c(OM, yret)) %>%
+    left_join(sim_design, by = "OM") %>%
+    mutate(y = factor(yret - 5)) %>%
+    mutate(row = paste0("log(rho)==", log_rho)) %>%
+    mutate(column = ifelse(ar_rho == 1, "RW~OM", "AR1~OM"))
 }
 
-coverage_ret <- calculate_index_coverage(index_ret, index_om, rel = FALSE)
-coverage_ret_norho <- calculate_index_coverage(index_ret_norho, index_om, rel = FALSE)
+coverage_ret <- calculate_index_coverage(index_ret, index_om)
+coverage_ret_norho <- calculate_index_coverage(index_ret_norho, index_om)
 
 g <- coverage_ret %>%
-  ggplot(aes(yret - min(yret) + 1, p_coverage, group = OM, colour = factor(kappa))) +
+  ggplot(aes(y, p_coverage, group = OM, colour = factor(kappa))) +
   geom_hline(yintercept = 0.95, linetype = 3) +
   geom_line(position = position_dodge(0.0)) +
   geom_point(position = position_dodge(0.0), aes(group = OM, shape = factor(phi))) +
