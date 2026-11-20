@@ -40,7 +40,7 @@ if (FALSE) {
   for (i in scenario) {
     om_i <- sfClusterApplyLB(1:nsim, function(x, i, sim_design, cell_width, intercept) {
       sim_OM(i, sim_design = sim_design, seed = x * 365, cell_width = cell_width, intercept = intercept)
-    }, i = i, sim_design = sim_design, cell_width = cell_width, intercept = 1000)
+    }, i = i, sim_design = sim_design, cell_width = cell_width, intercept = 50)
     message("OM ", i)
     saveRDS(om_i, file = paste0("simulation_simfield/operating_model_", i, ".rds"))
   }
@@ -70,14 +70,14 @@ for (i in seq(1, length(scenario))) {
 
   # Starting values of estimation model from operating model (not used)
   start_rho <- list(
-    b_j = c(log(1000), sim_design$log_rho[i]),
+    b_j = c(log(50), sim_design$log_rho[i]),
     ln_kappa = matrix(log(sim_design$kappa[i]), 2, 1),
     ln_tau_O = log(sim_design$sigma_O[i]),
     ln_tau_E = log(sim_design$sigma_E[i]),
     ln_phi = log(sim_design$phi[i])
   )
   start_norho <- start_rho
-  start_norho$b_j <- log(1000)
+  start_norho$b_j <- log(50)
 
   # Run retrospective ----
   message("Part 1")
