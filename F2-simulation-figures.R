@@ -2,6 +2,7 @@
 # Used to verify operating models and explore simulation results.
 
 library(tidyverse)
+library(ggh4x)
 
 # Generate indices of the OM ----
 sim_design <- readr::read_csv("simulation_simfield/sim_design.csv")
@@ -597,7 +598,6 @@ g <- trend_gap_stat %>%
                   shape = 4, linetype = 3,
                   show.legend = FALSE) +
   facet_grid(vars(row), vars(column), labeller = "label_parsed") +
-  #facet_wrap(vars(row), labeller = "label_parsed") +
   coord_cartesian(ylim = c(0, 0.5)) +
   scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
   labs(x = "Time gap between surveys",
@@ -619,6 +619,7 @@ calculate_index_coverage <- function(index_est, index_om) {
   index_est %>%
     left_join(index_om, by = c("OM", "year", "Simulation")) %>%
     mutate(Pop_rel = Population / exp(mean(log(Population))), .by = c(OM, Simulation, any_of(c("ngap", "yret")))) %>%
+    filter(!is.na(lwr) & !is.na(upr), .by = c(OM, Simulation, any_of(c("ngap", "yret")))) %>% # Eliminate simulations that don't converge (only 1)
     filter(year > 5) %>%
     mutate(good_coverage = lwr / geom_mean <= Pop_rel & upr / geom_mean >= Pop_rel) %>%
     summarise(p_coverage = mean(good_coverage), .by = c(OM, any_of(c("ngap", "yret")))) %>%
@@ -628,53 +629,53 @@ calculate_index_coverage <- function(index_est, index_om) {
 }
 
 coverage_ret <- calculate_index_coverage(index_ret, index_om) %>%
-  mutate(y = yret - 5, est_rho = "Indirect calibration")
+  mutate(y = yret - 5, est_rho = "\"Indirect calibration\"")
 coverage_ret_norho <- calculate_index_coverage(index_ret_norho, index_om) %>%
-  mutate(y = yret - 5, est_rho = "No calibration")
+  mutate(y = yret - 5, est_rho = "\"No calibration\"")
 
-g <- coverage_ret %>%
+g <- rbind(
+  coverage_ret,
+  coverage_ret_norho
+) %>%
   ggplot(aes(y, p_coverage, group = OM, colour = factor(kappa))) +
   geom_hline(yintercept = 0.95, linetype = 3) +
   geom_line(linewidth = 0.2) +
   geom_point(aes(shape = factor(phi))) +
-
-  geom_line(linewidth = 0.2, data = coverage_ret_norho, linetype = 2) +
-  geom_point(data = coverage_ret_norho, aes(shape = factor(phi))) +
-
-  facet_grid(vars(row), vars(column), labeller = "label_parsed") +
+  ggh4x::facet_nested(vars(row), vars(column, est_rho), labeller = "label_parsed") +
   coord_cartesian(ylim = c(0, 1)) +
   scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
+  scale_y_continuous(transform = "asn") +
   labs(x = "Years after vessel change",
        y = "Coverage of relative index",
        colour = expression(kappa),
        shape = expression(phi)) +
   theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
-ggsave("simulation_simfield/figures/sim_index_ret_coverage.png", g, height = 4, width = 3)
-ggsave("manuscript/figures/sim_index_ret_coverage.png", g, height = 4, width = 3)
+ggsave("simulation_simfield/figures/sim_index_ret_coverage.png", g, height = 4, width = 6)
+ggsave("manuscript/figures/sim_index_ret_coverage.png", g, height = 4, width = 6)
 
 
 coverage_gap <- calculate_index_coverage(index_gap, index_om) %>%
-  mutate(est_rho = "Indirect calibration")
+  mutate(est_rho = "\"Indirect calibration\"")
 coverage_gap_norho <- calculate_index_coverage(index_gap_norho, index_om) %>%
-  mutate(est_rho = "No calibration")
+  mutate(est_rho = "\"No calibration\"")
 
-g <- coverage_gap %>%
+g <- rbind(
+  coverage_gap,
+  coverage_gap_norho
+) %>%
   ggplot(aes(ngap, p_coverage, group = OM, colour = factor(kappa))) +
   geom_hline(yintercept = 0.95, linetype = 3) +
   geom_line(linewidth = 0.2) +
   geom_point(aes(shape = factor(phi))) +
-
-  geom_line(linewidth = 0.2, data = coverage_gap_norho, linetype = 2) +
-  geom_point(data = coverage_gap_norho, aes(shape = factor(phi))) +
-
-  facet_grid(vars(row), vars(column), labeller = "label_parsed") +
+  ggh4x::facet_nested(vars(row), vars(column, est_rho), labeller = "label_parsed") +
   coord_cartesian(ylim = c(0, 1)) +
   scale_shape_manual(values = c("0.2" = 16, "4" = 1)) +
+  scale_y_continuous(transform = "asn") +
   labs(x = "Time gaps between surveys",
        y = "Coverage of relative index",
        colour = expression(kappa),
        shape = expression(phi)) +
   theme(legend.position = "bottom", panel.spacing = unit(0, "in"), strip.background = element_blank())
-ggsave("simulation_simfield/figures/sim_index_gap_coverage.png", g, height = 4, width = 3)
-ggsave("manuscript/figures/sim_index_gap_coverage.png", g, height = 4, width = 3)
+ggsave("simulation_simfield/figures/sim_index_gap_coverage.png", g, height = 4, width = 6)
+ggsave("manuscript/figures/sim_index_gap_coverage.png", g, height = 4, width = 6)
 
