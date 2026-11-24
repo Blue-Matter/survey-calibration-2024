@@ -1,7 +1,7 @@
 ---
 title: "Index of abundance standardization across survey vessel changes when comparative fishing is not possible"
 author: "Quang C. Huynh^1^, Sean C. Anderson^2^, and Kevin J. Hedges^3^"
-date: "Under revision in Fisheries Research"
+date: "Under revision at Fisheries Research"
 output: 
   bookdown::word_document2:
     reference_docx: "manuscript_template.docx"
@@ -35,7 +35,7 @@ Indirect estimates are possible without CF data if the population process is not
 Across two case studies of vessel changes for six species with CF data, we show that indices from indirect calibration are similar in trend as those from direct calibration across the vessel change.
 While the indirect calibration factor was less precise and typically larger than the direct factor, indirect calibration frequently performed better than no calibration and provided a statistically rigorous approach to develop an integrated synthetic index.
 We show how statistical diagnostics can support or reject the suitability of indirect calibration when comparison to direct calibration is not possible in real world cases.
-Simulation experiments additionally supported the use of indirect calibration. 
+Simulation experiments additionally supported the use of indirect calibration, especially if the calibration factor is believed to be large. 
 While direct calibration remains the recommended approach, we propose indirect calibration as a potential tool when comparative fishing experiments are not possible.
 
 \newpage
@@ -226,7 +226,7 @@ For years 1-5, the log sample mean is $\log(\mu_{s,t}) = \log(\eta_{s,t})$. Afte
 
 Twenty-four (24) scenarios were developed from a factorial grid that varied four parameters of the operating model (Table \@ref(tab:sim-summary)):
 
-1. Spatial density pattern: the operating model was generated with either a low or high de-correlation rate $\kappa =$ of 5 and 25, respectively, in the GMRF. A low de-correlation rate indicates that spatial stock density is highly correlated between adjacent cells (Figure S1). These $\kappa$ values correspond to range values of 0.56 and 0.11, respectively. The low $\kappa$ scenario is informed by the case studies where the average relative range is 0.55.
+1. Spatial density pattern: the operating model was generated with either a low or high de-correlation rate, with $\kappa =$ 5 or 25, respectively, in the GMRF. A low de-correlation rate indicates that spatial stock density is highly correlated between adjacent cells (Figure S1). These $\kappa$ values correspond to range values of 0.56 and 0.11, respectively. The low $\kappa$ scenario is informed by the case studies where the average relative range is 0.55.
 
 2. Magnitude of vessel effect: samples were simulated with a vessel change starting in year 6, with three levels of $\log(\rho) =$ 0, 0.2, or 1.
 The scenarios with $\log(\rho) = 0$ provide an opportunity to evaluate performance in the absence of an underlying vessel effect.
@@ -305,28 +305,32 @@ The standard error also tended to increase with an increasing time gap, for exam
 
 ## Simulation testing
 
-The error and coverage in the indirect calibration factor are shown in the Supplementary Material.
-The $\rho_\textrm{ST}$ estimates showed some bias, where the median error was consistently above zero, across various model fits with the random walk operating models (Figures S2-S3). 
-However, the random walk estimation model performed better against the AR1 operating models as the median error was close to zero and the range in error was smaller.
-The error in $\rho$ was smaller with lower dispersion, i.e., $\phi = 4$, in the observation error and decreased as more data from the new vessel became available (Figure S2).
-The most improvement in decreasing the range of error in $\rho$ was seen once the model was fitted with 2 years of the new survey (Figure S2).
-On the other hand, the error increased as the time gap between surveys increased, particularly once the gap increased to 3--4 years (Figure S3). 
-These trends in the error of $\rho$ did not substantially differ with various magnitudes of $\rho$. 
+Simulation results with the retrospective analysis (adding more years of new survey data) are presented in Figures \@ref(fig:sim-rho-error)--\@ref(fig:sim-index-coverage), while results from the time gap analysis (increasing the time gap between surveys) are presented in the Supplementary Material.
 
-The coverage of $\rho$ was consistently high under the AR1 operating models (Figures S4-S5).
-Under the random walk operating models, coverage was highest with high spatial correlation (low $\kappa$) and low dispersion for all three calibration factors. 
-For other combinations of spatial correlation and dispersion, coverage was substantially lower with either an extensive time series of the new vessel (in the retrospective analysis, Figure S4) or the survey gap was small (Figure S5).
-This behavior indicates the standard errors are sufficiently wide with fewer data, but potentially overly precise with more data.
+The $\rho_\textrm{ST}$ estimates showed some bias, where the median error fluctuated above or below zero, across various model fits (Figure \@ref(fig:sim-rho-error)).
+The random walk estimation model performed better against the AR1 operating models than in random walk operating models in terms of bias (the median error was frequently closer to zero) at the cost of lower precision (where the range in error increased). 
+The error generally increased with higher calibration factor, higher spatial correlation (low $\kappa$), and higher dispersion (low $\phi$).
+Error decreased, but not appreciably, as more data from the new vessel became available. 
+In many scenarios, i.e., with high $\kappa$, the most improvement in the model, i.e., reducing the range in error, was seen when the model was fitted with at least 2 years of the new survey. 
+On the other hand, the error was much larger when there is a time gap between surveys, particularly once the gap increased to 3–4 years (Supplementary Figure S5).
 
-With indirect calibration, the RMSE in the index trend was lower with low spatial correlation ($\kappa = 50$) than with high correlation, particularly in the random walk operating model (Figures \@ref(fig:sim-trend)--\@ref(fig:sim-trend2)).
-RMSE of the indirectly calibrated index also did not substantially change with $\rho$.
-Importantly, RMSE was lower with indirect calibration than no calibration.
-As expected, the difference in performance grew as the calibration factor was larger, indicating that indirect calibration was increasingly preferable.
-RMSE decreased with more data and years from the new vessel, where the decline in error is most notable in the random walk operating models (Figure \@ref(fig:sim-trend)).
+With no catchability difference between surveys, i.e., $\log(\rho) = 0$, the coverage of $\log(\rho)$ was highest with high spatial correlation (low $\kappa$) and low dispersion (high $\phi$) (red open circles in Figure \@ref(fig:sim-rho-coverage) and Supplementary Figure S6). 
+In contrast, the lowest coverage frequently occurred with high dispersion (Figure \@ref(fig:sim-rho-coverage), filled circles). 
+The coverage also tended to increase with more data, for example, when there was no catchability difference between surveys, i.e., $\log(\rho) = 0$ (Figure \@ref(fig:sim-rho-coverage), top row). 
+This behaviour indicates that the standard errors can be overly precise with few data (coverage below 95%), but either the calibration is more accurate or the confidence intervals are appropriately wider with more data. 
+Otherwise, with larger calibration factors, i.e., $\log(\rho) = 1$, more data did not appear to improve coverage.
+When the survey gap increased, the coverage decreased when the true calibration factor is large (Supplementary Figure S6). Otherwise, coverage can remain fairly high with a survey gap if there is no calibration differences between surveys.
 
-On the other hand, when the time gap between surveys increased, the index trend RMSE did not substantially increase (Figure \@ref(fig:sim-trend2)). 
-While the error between the indirectly calibrated and uncalibrated indices was frequently similar, we found situations where the calibration method performed much better, i.e., with high $\rho$ and the AR1 operating model.
-However, large errors in $\rho$ in Figure S3 are more likely to give wide confidence intervals in the index, which can decrease confidence in the time series when used in real world situations. 
+With indirect calibration, the RMSE in the index trend was lower with lower dispersion than with high dispersion (Figures \@ref(fig:sim-trend) and Supplementary Figure S7). 
+High spatial correlation ($\kappa = 5$) led to lower RMSE than with low correlation in the random walk operating model, but led to higher RMSE in the AR1 operating model. 
+Importantly, RMSE was lower with indirect calibration than no calibration when the calibration factor is large.
+With lower to no calibration differences, indirect calibration performs similarly or slightly worse than no calibration because the spatiotemporal model estimates more parameters, i.e. the model is not parsimonious. 
+RMSE decreased with more data from the new vessel in both random walk and AR1 operating models (Figure \@ref(fig:sim-trend)). However, RMSE increased with larger time gaps (Supplementary Figure S7).
+
+The coverage of the relative indices followed two broad trends.
+First, the coverage of the indirectly calibrated index is frequently higher with high spatial correlation and did not substantially change with more data (Figure \@ref(fig:sim-index-coverage)). 
+With lower spatial correlation, the coverage was more likely below the 95% threshold. 
+Second, the indirectly calibrated index had higher coverage than the uncalibrated index, especially when the calibration factor is large.
 
 # Discussion
 
@@ -337,7 +341,7 @@ In almost all cases (5/6), indirectly calibrated indices were also preferred ove
 Overlap in the error bars of the directly and indirectly calibrated indices indicate a strong level of agreement in the interpretation of stock trends across the change in survey vessel, but often with increased uncertainty for the indirectly calibrated index.
 
 The simulation study generally supported the key findings from the case studies. 
-With a large vessel effect, indirect calibration was preferred over no calibration, while indirect calibration did not worsen index trends when there was a small or no vessel effect.
+There was some bias and notable imprecision in some scenarios from the calibration model. Ultimately, with a large vessel effect, indirect calibration was preferred over no calibration, while indirect calibration did not worsen index trends when there was a small or no vessel effect.
 
 While half of the simulation operating models match the estimation model (best-case scenario), the random walk structure in the estimation model allows the variance to grow over time.
 Real population dynamics can have heavy-tailed distributions (with occasional large perturbations) or changing variance structure, and either would affect the predicted state at the survey vessel change and the uncertainty around it. 
@@ -349,8 +353,9 @@ Future applications could consider an additional Gaussian or heavy-tailed distri
 
 Statistical diagnostics are important analyses that can support use of the indirect calibration factor, especially if indices of abundance are used in a management setting.
 Indirect calibration performed favorably with respect to the true negative test and the retrospective analysis.
-The stability in calibration estimates in the retrospective analysis suggested that the model estimates the survey calibration factor frequently from the first year of the new data. 
-This may raise concerns that any anomaly in that year directly affects rho, but the aforementioned statistical diagnostics can inform analysts whether estimates are credible.
+The stability in calibration estimates in the retrospective analysis suggested that the model estimates the survey calibration factor frequently from the first few years of the new data. 
+This may raise concerns that any anomaly in that year directly affects $\rho$.
+Therefore, we recommend to use indirect calibration when the calibration factor is expected to be large, and when the aforementioned statistical diagnostics inform analysts that estimates are credible.
 
 It is possible to estimate the calibration factor once and use the same estimate for all subsequent updates of the index.
 While this approach would lose the error propagation properties demonstrated here, Bayesian approaches may incorporate priors on calibration factors, either indirect or direct, to incorporate calibration uncertainty in the index.
@@ -558,6 +563,7 @@ flextable(diag_sum) %>%
   width(j = 1, width = 2)
 ```
 
+<!--
 \newpage
 
 ```{r sim-coverage, results="asis"}
@@ -580,6 +586,7 @@ flextable(p_cov_table) %>%
     caption = "Table caption."
   )
 ```
+-->
 
 \newpage
 
@@ -593,7 +600,7 @@ knitr::include_graphics(here::here("manuscript/figures/rho_casestudy.png"))
 knitr::include_graphics(here::here("manuscript/figures/index_compare_ci.png"))
 ```
 
-```{r rho-diagnostic, fig.cap="Estimates (points and 95% confidence interval linerange) of the indirect calibration factor (x-axis) under three diagnostic procedures (columns) for each case study (rows). Left column: calibration factors from fitting to data from only the new survey, repeated for various dummy years (y-axis); the estimate should not be significantly different from zero (dotted horizontal line). Right column: calibration factors as more data from the new survey are available (number of years with new data in the y-axis), ideally, there is no trend in the calibration factor over time. The vertical dotted line is the calibration factor from comparative fishing and the shaded region is the 95% confidence interval."}
+```{r rho-diagnostic, out.width="4in", fig.cap="Estimates (points and 95% confidence interval linerange) of the indirect calibration factor (x-axis) under three diagnostic procedures (columns) for each case study (rows). Left column: calibration factors from fitting to data from only the new survey, repeated for various dummy years (y-axis); the estimate should not be significantly different from zero (dotted horizontal line). Right column: calibration factors as more data from the new survey are available (number of years with new data in the y-axis), ideally, there is no trend in the calibration factor over time. The vertical dotted line is the calibration factor from comparative fishing and the shaded region is the 95% confidence interval."}
 knitr::include_graphics(here::here("manuscript/figures/diagnostics.png"))
 ```
 
@@ -601,26 +608,23 @@ knitr::include_graphics(here::here("manuscript/figures/diagnostics.png"))
 knitr::include_graphics(here::here("manuscript/figures/index_retrospective.png"))
 ```
 
-```{r sim-rho-error, fig.cap="Distribution of error (median in points and vertical lines span 95% quantile) in the indirect calibration factor estimate (y-axis) in the simulation study. Colours identify the kappa parameter (lower values indicate higher spatial correlation) and shapes identify the dispersion parameter (lower values indicate higher variance) in the operating model. The x-axis shows the error as new annual survey data is added to the spatiotemporal model (from 1 to 5 years). Rows show three levels of catchability differences between vessels. Columns show the evolution of spatiotemporal field in the operating model (either autoregressive or random walk)."}
+```{r sim-rho-error, fig.cap="Distribution of error (median in points and vertical lines span 95% quantile) in the indirect calibration factor estimate (y-axis) in the simulation study. Colours identify the kappa parameter (lower values indicate higher spatial correlation) and shapes identify the dispersion parameter (lower values indicate higher variance) in the operating model. The x-axis indicates the error as new annual survey data is added to the spatiotemporal model (from 1 to 5 years). Rows show three levels of catchability differences between vessels. Columns show the evolution of spatiotemporal field in the operating model (either autoregressive or random walk)."}
+knitr::include_graphics(here::here("manuscript/figures/sim_rho_error_retrospective.png"))
+```
+
+```{r sim-rho-coverage, fig.cap="Coverage of the 95% confidence interval in the indirect calibration factor estimate (y-axis) in the simulation study. The x-axis indicates the coverage as new annual survey data is added to the spatiotemporal model (from 1 to 5 years) Horizontal lines connect simulations for a unique set of parameters."}
 knitr::include_graphics(here::here("manuscript/figures/sim_rho_coverage_retrospective.png"))
 ```
 
-```{r sim-rho-coverage, fig.cap="Coverage of the 95% confidence interval in the indirect calibration factor estimate (y-axis) in the simulation study."}
-knitr::include_graphics(here::here("manuscript/figures/sim_rho_coverage_retrospective.png"))
-```
 
-
-(ref:fig-sim-trend) Dot and line plots of the root mean square error (RMSE) in the index trends (y-axis) in the simulation study. Circles with solid lines denote the RMSE from the indirectly calibrated index whereas crosses with dotted lines are from the uncalibrated index. Colours denote the spatial de-correlation parameter κ, where high values denote low spatial correlation. The circle shading (filled vs. open) denotes the dispersion parameter (lower values are more dispersed).
+(ref:fig-sim-trend) Dot and line plots of the root mean square error (RMSE) in the index trends (y-axis) in the simulation study. Circles with solid lines denote the RMSE from the indirectly calibrated index whereas crosses with dotted lines are from the uncalibrated index. Colours denote the spatial de-correlation parameter $\kappa$, where high values denote low spatial correlation. The circle shading (filled vs. open) denotes the dispersion parameter (lower values are more dispersed).
 
 ```{r sim-trend, fig.cap="(ref:fig-sim-trend)"}
 knitr::include_graphics(here::here("manuscript/figures/sim_trend_RMSE_retrospective.png"))
 ```
 
-
-(ref:fig-sim-index-coverage) Dot and line plots of the coverage in the relative index (y-axis) in the simulation study. Solid lines denote the coverage from the indirectly calibrated index whereas dotted lines denote coverage from the uncalibrated index. 
-
-```{r sim-index-coverage, fig.cap="(ref:fig-sim-index-coverage)"}
-knitr::include_graphics(here::here("manuscript/figures/sim_index_coverage.png"))
+```{r sim-index-coverage, fig.cap="Dot and line plots of the coverage in the relative index (y-axis) in the simulation study. Solid lines denote the coverage from the indirectly calibrated index whereas dotted lines denote coverage from the uncalibrated index."}
+knitr::include_graphics(here::here("manuscript/figures/sim_index_ret_coverage.png"))
 ```
 
 
